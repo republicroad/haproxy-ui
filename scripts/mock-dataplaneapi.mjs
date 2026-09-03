@@ -128,6 +128,28 @@ const server = createServer((req, res) => {
       return send(res, 202, {})
     }
 
+    // runtime per-backend server states (mirrors real dataplaneapi fields)
+    const rtSrvMatch = p.match(
+      /^services\/haproxy\/runtime\/backends\/(.+)\/servers$/,
+    )
+    if (rtSrvMatch && method === "GET") {
+      const beName = decodeURIComponent(rtSrvMatch[1])
+      const be = backends.get(beName)
+      if (!be) return send(res, 404, { code: 404, message: "backend not found" })
+      const runtime = (be.servers || []).map((s) => ({
+        name: s.name,
+        address: s.address,
+        port: s.port,
+        weight: s.weight ?? 100,
+        operational_state: "ready",
+        admin_state: "ready",
+        fqdn: "-",
+        backend_name: beName,
+        id: "1",
+      }))
+      return send(res, 200, runtime)
+    }
+
     return send(res, 404, { code: 404, message: `no mock for ${method} ${p}` })
   })
 })

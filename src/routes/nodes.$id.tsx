@@ -39,7 +39,7 @@ import {
   ServersModal,
 } from "#/components/NodeConfigDialogs"
 
-const TABS = ["overview", "frontends", "backends", "raw"] as const
+const TABS = ["overview", "frontends", "backends", "stats", "raw"] as const
 type Tab = (typeof TABS)[number]
 
 async function fetchNode(id: string): Promise<NodeRow> {
@@ -71,7 +71,7 @@ function NodeDetail() {
   const beQ = useQuery({
     queryKey: ["backends", id],
     queryFn: () => dpGet<Backend[]>(id, "services/haproxy/configuration/backends"),
-    enabled: mounted && tab === "backends",
+    enabled: mounted && (tab === "backends" || tab === "stats"),
   })
   const rawQ = useQuery({
     queryKey: ["raw", id],
@@ -139,6 +139,10 @@ function NodeDetail() {
           onError={setError}
           onChanged={refetch}
         />
+      )}
+
+      {tab === "stats" && (
+        <StatsTab nodeId={id} backends={beQ.data ?? []} loading={beQ.isLoading} />
       )}
 
       {tab === "raw" && (
@@ -377,6 +381,136 @@ function BackendsTab({
           onError={onError}
         />
       )}
+    </div>
+  )
+}
+
+type RuntimeServer = {
+  name: string
+  address?: string
+  port?: number
+  weight?: number
+  operational_state?: string
+  admin_state?: string
+  fqdn?: string
+  backend_name?: string
+}
+
+type RuntimeServerRow = RuntimeServer & { backend: string }
+
+function RuntimeStateBadge({ state }: { state?: string }) {
+  const v =
+    state === "ready"
+      ? "success"
+      : state === "down"
+        ? "destructive"
+        : "secondary"
+  return <Badge variant={v}>{state ?? "unknown"}</Badge>
+}
+
+function StatsTab({
+  nodeId,
+  backends,
+  loading,
+}: {
+  nodeId: string
+  backends: Backend[]
+  loading: boolean
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const statsQ = useQuery({
+    queryKey: ["runtime-servers", nodeId, backends.map((b) => b.name).join(",")],
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        backends.map(async (b) => ({
+          backend: b.name,
+          servers: await dpGet<RuntimeServer[]>(
+            nodeId,
+            `services/haproxy/runtime/backends/${encodeURIComponent(b.name)}/servers`,
+          ),
+        })),
+      )
+      const rows: RuntimeServerRow[] = []
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          for (const s of r.value.servers ?? []) {
+            rows.push({ ...s, backend: r.value.backend })
+          }
+        } else {
+          rows.push({
+            name: "?",
+            backend: "",
+            operational_state: "unreachable",
+          })
+        }
+      }
+      return rows
+    },
+    enabled: mounted,
+    refetchInterval: 10_000,
+  })
+
+  const rows = statsQ.data ?? []
+  const columns: ColumnDef<TableFeatures, RuntimeServerRow>[] = [
+    { accessorKey: "backend", header: "Backend" },
+    {
+      accessorKey: "name",
+      header: "Server",
+      cell: ({ row }) => row.original.name ?? "—",
+    },
+    {
+      id: "address",
+      header: "Address",
+      cell: ({ row }) =>
+        row.original.address
+          ? `${row.original.address}:${row.original.port ?? "?"}`
+          : "—",
+    },
+    { accessorKey: "weight", header: "Weight" },
+    {
+      id: "state",
+      header: "State",
+      cell: ({ row }) => (
+        <RuntimeStateBadge state={row.original.operational_state} />
+      ),
+    },
+    {
+      id: "admin",
+      header: "Admin",
+      cell: ({ row }) => row.original.admin_state ?? "—",
+    },
+  ]
+  const table = useTable({ data: rows, columns, features: dataGridFeatures })
+
+  if (loading) return <p className="text-muted-foreground">Loading…</p>
+  if (backends.length === 0)
+    return (
+      <p className="text-muted-foreground">
+        No backends configured — create one in the Backends tab.
+      </p>
+    )
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Live server states from the HAProxy runtime API, refreshed every 10s
+        </p>
+        <Button variant="outline" size="sm" onClick={() => statsQ.refetch()}>
+          Refresh
+        </Button>
+      </div>
+      {statsQ.isError && (
+        <Alert variant="default">
+          Cannot read runtime states: {(statsQ.error as Error).message}
+        </Alert>
+      )}
+      <DataGrid table={table} recordCount={rows.length}>
+        <DataGridContainer>
+          <DataGridTable />
+        </DataGridContainer>
+        <DataGridPagination />
+      </DataGrid>
     </div>
   )
 }

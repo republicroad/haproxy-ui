@@ -23,7 +23,7 @@ services:
       - "8404:8404"   # haproxy stats
       - "8000:8080"   # sample frontend
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "--header=Authorization: Basic YWRtaW46YWRtaW4=", "http://127.0.0.1:5555/v2/services/haproxy/runtime/info"]
+      test: ["CMD", "wget", "-qO-", "--header=Authorization: Basic YWRtaW46YWRtaW4=", "http://127.0.0.1:5555/v3/services/haproxy/runtime/info"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,7 +38,7 @@ services:
       - "8405:8404"   # haproxy stats
       - "8001:8080"   # sample frontend
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "--header=Authorization: Basic YWRtaW46YWRtaW4=", "http://127.0.0.1:5555/v2/services/haproxy/runtime/info"]
+      test: ["CMD", "wget", "-qO-", "--header=Authorization: Basic YWRtaW46YWRtaW4=", "http://127.0.0.1:5555/v3/services/haproxy/runtime/info"]
       interval: 10s
       timeout: 5s
       retries: 5

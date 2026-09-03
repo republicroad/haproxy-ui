@@ -1,0 +1,19 @@
+node_modules
+dist
+.nitro
+.output
+.env.local
+.env.*.local
+*.db
+*.db-journal
+*.log
+*.err
+*.out
+.DS_Store
+.tanstack/
+
+# HAProxy dev environment artifacts
+haproxy/v3bin/
+haproxy/*.tar.gz
+haproxy/run/
+haproxy/*/run/

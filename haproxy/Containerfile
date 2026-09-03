@@ -1,0 +1,16 @@
+FROM docker.io/haproxytech/haproxy-alpine:s6-3.3
+
+RUN mkdir -p /etc/haproxy/maps /etc/haproxy/ssl /etc/haproxy/general \
+    /etc/haproxy/spoe /var/lib/dataplaneapi/transactions /var/lib/dataplaneapi/backups
+
+COPY v3bin/dataplaneapi /usr/local/bin/dataplaneapi
+RUN chmod +x /usr/local/bin/dataplaneapi
+
+COPY haproxy.cfg /etc/haproxy/haproxy.cfg
+COPY dataplaneapi.yml /etc/haproxy/dataplaneapi.yml
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+EXPOSE 5555 8404 8080
+
+CMD ["/start.sh"]

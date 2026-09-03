@@ -1,0 +1,93 @@
+# =============================================================================
+# .gitattributes — 跨平台换行符管理
+# =============================================================================
+# 使用方式：
+#   git add --renormalize .    # 修正已有文件换行符
+#   git commit -m "Normalize line endings via .gitattributes"
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 1. 默认规则：所有文本文件存储 LF，检出时按平台自动转换
+# ---------------------------------------------------------------------------
+* text=auto eol=lf
+
+# ---------------------------------------------------------------------------
+# 2. Linux / 通用文本文件 — 始终 LF
+# ---------------------------------------------------------------------------
+*.sh      text eol=lf
+*.bash    text eol=lf
+*.py      text eol=lf
+*.java    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.json    text eol=lf
+*.xml     text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.sql     text eol=lf
+*.conf    text eol=lf
+*.cfg     text eol=lf
+*.ini     text eol=lf
+*.html    text eol=lf
+*.css     text eol=lf
+*.js      text eol=lf
+*.ts      text eol=lf
+*.go      text eol=lf
+*.rs      text eol=lf
+*.c       text eol=lf
+*.cpp     text eol=lf
+*.h       text eol=lf
+*.vue     text eol=lf
+*.jsx     text eol=lf
+*.tsx     text eol=lf
+*.gradle  text eol=lf
+*.properties text eol=lf
+
+# ---------------------------------------------------------------------------
+# 3. Windows 脚本 / 命令行文件 — 始终 CRLF
+#    Windows CMD/PowerShell 要求脚本以 CRLF 结尾才能正常执行
+# ---------------------------------------------------------------------------
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+*.psm1    text eol=crlf
+*.psd1    text eol=crlf
+*.vbs     text eol=crlf
+*.vba     text eol=crlf
+*.wsf     text eol=crlf
+*.wsh     text eol=crlf
+
+# ---------------------------------------------------------------------------
+# 4. Docker / CI 配置
+# ---------------------------------------------------------------------------
+Dockerfile    text eol=lf
+Makefile      text eol=lf
+*.dockerignore text eol=lf
+
+# ---------------------------------------------------------------------------
+# 5. 二进制文件 — 不做任何转换
+# ---------------------------------------------------------------------------
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.svg     text eol=lf
+*.webp    binary
+*.zip     binary
+*.gz      binary
+*.tar     binary
+*.rar     binary
+*.7z      binary
+*.jar     binary
+*.class   binary
+*.war     binary
+*.ear     binary
+*.pdf     binary
+*.docx    binary
+*.xlsx    binary
+*.pptx    binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.eot     binary

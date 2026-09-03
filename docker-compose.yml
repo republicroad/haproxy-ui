@@ -1,0 +1,44 @@
+# Dev/test environment: two HAProxy nodes, each running haproxy + dataplaneapi v2
+# in a single container (localhost/haproxy-dp, built from ./haproxy).
+#
+# Build the image once:
+#   podman build -t localhost/haproxy-dp -f haproxy/Containerfile haproxy/
+#
+# Start the stack:
+#   podman compose up -d
+#
+# Then register nodes in the app with apiUrl:
+#   http://localhost:5555   (node 1)
+#   http://localhost:5556   (node 2)
+#
+# App (BFF) proxies /api/dp/:id/* -> dataplaneapi -> haproxy runtime socket.
+services:
+  hap1:
+    image: localhost/haproxy-dp
+    build:
+      context: ./haproxy
+      dockerfile: Containerfile
+    ports:
+      - "5555:5555"   # dataplaneapi
+      - "8404:8404"   # haproxy stats
+      - "8000:8080"   # sample frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--header=Authorization: Basic YWRtaW46YWRtaW4=", "http://127.0.0.1:5555/v2/services/haproxy/runtime/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hap2:
+    image: localhost/haproxy-dp
+    build:
+      context: ./haproxy
+      dockerfile: Containerfile
+    ports:
+      - "5556:5555"   # dataplaneapi
+      - "8405:8404"   # haproxy stats
+      - "8001:8080"   # sample frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--header=Authorization: Basic YWRtaW46YWRtaW4=", "http://127.0.0.1:5555/v2/services/haproxy/runtime/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

@@ -78,14 +78,26 @@ export async function dpDelete(nodeId: string, path: string, txId?: string) {
   return res
 }
 
+export type ChangeMeta = {
+  kind: "create" | "delete"
+  resource: "frontend" | "backend" | "server"
+  target: string
+  parent?: string
+  payload?: unknown
+}
+
 /**
  * Run a batch of dataplaneapi writes inside a single transaction, then commit
  * (which triggers haproxy -c validation + graceful reload). On any failure the
  * transaction is rolled back.
+ *
+ * When `meta` is provided, the committed change is recorded in the app's
+ * change history (with a raw config snapshot) for later diff/revert.
  */
 export async function withTransaction(
   nodeId: string,
   fn: (txId: string) => Promise<void>,
+  meta?: ChangeMeta,
 ): Promise<void> {
   const version = await dpGet<number>(
     nodeId,
@@ -106,5 +118,17 @@ export async function withTransaction(
       method: "DELETE",
     }).catch(() => {})
     throw e
+  }
+  if (meta) {
+    try {
+      const raw = await dpRaw(nodeId, "services/haproxy/configuration/raw")
+      await fetch(`/api/nodes/${nodeId}/changes`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...meta, txId: tx.id, rawAfter: raw.slice(0, 200_000) }),
+      })
+    } catch {
+      // history recording must never break the operation itself
+    }
   }
 }

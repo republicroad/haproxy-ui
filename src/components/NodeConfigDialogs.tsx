@@ -121,14 +121,23 @@ export function FrontendDialog({
         throw new Error("Please fix the highlighted fields")
       }
       setErrors({})
-      return withTransaction(nodeId, async (tx) => {
-        await dpPost(
-          nodeId,
-          "services/haproxy/configuration/frontends",
-          parsed.data,
-          tx,
-        )
-      })
+      return withTransaction(
+        nodeId,
+        async (tx) => {
+          await dpPost(
+            nodeId,
+            "services/haproxy/configuration/frontends",
+            parsed.data,
+            tx,
+          )
+        },
+        {
+          kind: "create",
+          resource: "frontend",
+          target: parsed.data.name,
+          payload: parsed.data,
+        },
+      )
     },
     onSuccess: () => {
       onCreated()
@@ -255,14 +264,23 @@ export function BackendDialog({
         throw new Error("Please fix the highlighted fields")
       }
       setErrors({})
-      return withTransaction(nodeId, async (tx) => {
-        await dpPost(
-          nodeId,
-          "services/haproxy/configuration/backends",
-          parsed.data,
-          tx,
-        )
-      })
+      return withTransaction(
+        nodeId,
+        async (tx) => {
+          await dpPost(
+            nodeId,
+            "services/haproxy/configuration/backends",
+            parsed.data,
+            tx,
+          )
+        },
+        {
+          kind: "create",
+          resource: "backend",
+          target: parsed.data.name,
+          payload: parsed.data,
+        },
+      )
     },
     onSuccess: () => {
       onCreated()
@@ -375,14 +393,24 @@ export function ServersModal({
         throw new Error("Please fix the highlighted fields")
       }
       setErrors({})
-      return withTransaction(nodeId, async (tx) => {
-        await dpPost(
-          nodeId,
-          `services/haproxy/configuration/backends/${encodeURIComponent(backend.name)}/servers`,
-          parsed.data,
-          tx,
-        )
-      })
+      return withTransaction(
+        nodeId,
+        async (tx) => {
+          await dpPost(
+            nodeId,
+            `services/haproxy/configuration/backends/${encodeURIComponent(backend.name)}/servers`,
+            parsed.data,
+            tx,
+          )
+        },
+        {
+          kind: "create",
+          resource: "server",
+          target: parsed.data.name,
+          parent: backend.name,
+          payload: parsed.data,
+        },
+      )
     },
     onSuccess: () => {
       setForm({ name: "", address: "", port: 80, weight: 100, check: false })

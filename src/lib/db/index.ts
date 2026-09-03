@@ -32,6 +32,20 @@ db.exec(`
     last_seen INTEGER,
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS config_changes (
+    id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    target TEXT NOT NULL,
+    parent TEXT,
+    payload TEXT,
+    tx_id TEXT,
+    reverted INTEGER NOT NULL DEFAULT 0,
+    raw_after TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_changes_node ON config_changes(node_id, ts);
 `)
 
 type NodeSqliteRow = {
@@ -122,4 +136,91 @@ export function updateNode(
 
 export function deleteNode(id: string): void {
   db.prepare("DELETE FROM nodes WHERE id = ?").run(id)
+}
+
+export type ChangeRow = {
+  id: string
+  nodeId: string
+  ts: number
+  kind: string
+  resource: string
+  target: string
+  parent: string | null
+  payload: string | null
+  txId: string | null
+  reverted: number
+  rawAfter: string | null
+}
+
+type ChangeSqliteRow = {
+  id: string
+  node_id: string
+  ts: number
+  kind: string
+  resource: string
+  target: string
+  parent: string | null
+  payload: string | null
+  tx_id: string | null
+  reverted: number
+  raw_after: string | null
+}
+
+function rowToChange(row: ChangeSqliteRow): ChangeRow {
+  return {
+    id: row.id,
+    nodeId: row.node_id,
+    ts: row.ts,
+    kind: row.kind,
+    resource: row.resource,
+    target: row.target,
+    parent: row.parent ?? null,
+    payload: row.payload ?? null,
+    txId: row.tx_id ?? null,
+    reverted: row.reverted,
+    rawAfter: row.raw_after ?? null,
+  }
+}
+
+export function insertChange(c: ChangeRow): void {
+  db.prepare(
+    "INSERT INTO config_changes (id, node_id, ts, kind, resource, target, parent, payload, tx_id, reverted, raw_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(
+    c.id,
+    c.nodeId,
+    c.ts,
+    c.kind,
+    c.resource,
+    c.target,
+    c.parent,
+    c.payload,
+    c.txId,
+    c.reverted,
+    c.rawAfter,
+  )
+}
+
+/** List a node's changes, newest first. raw_after excluded to keep it light. */
+export function listChangesByNode(nodeId: string, limit = 50): Omit<ChangeRow, "rawAfter">[] {
+  return (
+    db
+      .prepare(
+        "SELECT id, node_id, ts, kind, resource, target, parent, payload, tx_id, reverted FROM config_changes WHERE node_id = ? ORDER BY ts DESC LIMIT ?",
+      )
+      .all(nodeId, limit) as ChangeSqliteRow[]
+  ).map((r) => {
+    const { rawAfter: _raw, ...rest } = rowToChange(r)
+    return rest
+  })
+}
+
+export function getChange(id: string): ChangeRow | undefined {
+  const row = db.prepare("SELECT * FROM config_changes WHERE id = ?").get(id) as
+    | ChangeSqliteRow
+    | undefined
+  return row ? rowToChange(row) : undefined
+}
+
+export function markReverted(id: string): void {
+  db.prepare("UPDATE config_changes SET reverted = 1 WHERE id = ?").run(id)
 }

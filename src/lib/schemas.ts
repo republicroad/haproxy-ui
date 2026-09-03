@@ -74,6 +74,16 @@ export const backendInputSchema = z.object({
   description: z.string().trim().optional(),
 })
 
+export const changeMetaSchema = z.object({
+  kind: z.enum(["create", "delete"]),
+  resource: z.enum(["frontend", "backend", "server"]),
+  target: z.string().trim().min(1),
+  parent: z.string().trim().optional(),
+  payload: z.unknown().optional(),
+  txId: z.string().trim().optional(),
+  rawAfter: z.string().max(200_000).optional(),
+})
+
 /** Flatten a ZodError into { field: message } for API responses / form display. */
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {}

@@ -11,7 +11,43 @@ import appCss from "../styles.css?url"
 
 const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'auto';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
 
+const UI_USER = process.env.HAPROXY_UI_USER
+const UI_PASS = process.env.HAPROXY_UI_PASS
+
+function checkBasicAuth(request: Request): boolean {
+  if (!UI_USER || !UI_PASS) return true
+  const header = request.headers.get("authorization")
+  if (!header?.startsWith("Basic ")) return false
+  try {
+    const decoded = atob(header.slice(6))
+    const [user, pass] = decoded.split(":")
+    return user === UI_USER && pass === UI_PASS
+  } catch {
+    return false
+  }
+}
+
+async function serverAuthCheck() {
+  if (typeof window !== "undefined") return
+  if (!UI_USER || !UI_PASS) return
+  try {
+    const { getRequest } = await import("@tanstack/react-start/server")
+    const request = getRequest()
+    if (!checkBasicAuth(request)) {
+      throw new Response("Unauthorized", {
+        status: 401,
+        headers: { "WWW-Authenticate": 'Basic realm="haproxy-ui"' },
+      })
+    }
+  } catch (e) {
+    if (e instanceof Response) throw e
+  }
+}
+
 export const Route = createRootRoute({
+  beforeLoad: async () => {
+    await serverAuthCheck()
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

@@ -40,6 +40,7 @@ import {
 } from "#/components/NodeConfigDialogs"
 import { Modal } from "#/components/Modal"
 import { ConfirmDialog } from "#/components/ConfirmDialog"
+import { SyncModal } from "#/components/SyncModal"
 import { diffLines } from "#/lib/diff"
 
 const TABS = ["overview", "frontends", "backends", "stats", "history", "raw"] as const
@@ -57,6 +58,7 @@ function NodeDetail() {
   const [tab, setTab] = useState<Tab>("overview")
   const [mounted, setMounted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [syncOpen, setSyncOpen] = useState(false)
   useEffect(() => setMounted(true), [])
 
   const nodeQ = useQuery({ queryKey: ["node", id], queryFn: () => fetchNode(id) })
@@ -95,10 +97,22 @@ function NodeDetail() {
           <h1 className="text-2xl font-bold">{nodeQ.data?.name ?? id}</h1>
           <p className="text-muted-foreground">{nodeQ.data?.apiUrl}</p>
         </div>
-        <Badge variant={nodeQ.data?.status === "up" ? "success" : "secondary"}>
-          {nodeQ.data?.status ?? "…"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSyncOpen(true)}
+            disabled={!nodeQ.data}
+          >
+            Sync to nodes
+          </Button>
+          <Badge variant={nodeQ.data?.status === "up" ? "success" : "secondary"}>
+            {nodeQ.data?.status ?? "…"}
+          </Badge>
+        </div>
       </div>
+
+      {syncOpen && <SyncModal nodeId={id} onClose={() => setSyncOpen(false)} />}
 
       <Stepper
         value={TABS.indexOf(tab) + 1}

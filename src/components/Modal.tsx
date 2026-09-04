@@ -7,11 +7,13 @@ export function Modal({
   onClose,
   title,
   children,
+  wide,
 }: {
   open: boolean
   onClose: () => void
   title: string
   children: React.ReactNode
+  wide?: boolean
 }) {
   useEffect(() => {
     if (!open) return
@@ -30,7 +32,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-lg"
+        className={`w-full ${wide ? "max-w-2xl" : "max-w-lg"} rounded-lg border border-border bg-card p-5 shadow-lg`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

@@ -97,7 +97,7 @@ export type ChangeMeta = {
 export async function withTransaction(
   nodeId: string,
   fn: (txId: string) => Promise<void>,
-  meta?: ChangeMeta,
+  meta?: ChangeMeta | ChangeMeta[],
 ): Promise<void> {
   const version = await dpGet<number>(
     nodeId,
@@ -122,11 +122,20 @@ export async function withTransaction(
   if (meta) {
     try {
       const raw = await dpRaw(nodeId, "services/haproxy/configuration/raw")
-      await fetch(`/api/nodes/${nodeId}/changes`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...meta, txId: tx.id, rawAfter: raw.slice(0, 200_000) }),
-      })
+      const metas = Array.isArray(meta) ? meta : [meta]
+      await Promise.all(
+        metas.map((m) =>
+          fetch(`/api/nodes/${nodeId}/changes`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              ...m,
+              txId: tx.id,
+              rawAfter: raw.slice(0, 200_000),
+            }),
+          }),
+        ),
+      )
     } catch {
       // history recording must never break the operation itself
     }

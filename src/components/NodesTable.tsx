@@ -1,6 +1,12 @@
 "use client"
 
-import { useTable, type ColumnDef, type TableFeatures } from "@tanstack/react-table"
+import { useState } from "react"
+import {
+  filterFn_includesString,
+  useTable,
+  type ColumnDef,
+  type TableFeatures,
+} from "@tanstack/react-table"
 import {
   DataGrid,
   DataGridContainer,
@@ -12,6 +18,7 @@ import { Badge } from "#/components/reui/badge"
 import { Button } from "#/components/ui/button"
 import { Link } from "@tanstack/react-router"
 import type { NodeRow } from "#/lib/types"
+import { GridSearchInput } from "./GridSearchInput"
 
 function StatusBadge({ status }: { status: string }) {
   const v =
@@ -36,6 +43,7 @@ export function NodesTable({
   onDelete?: (n: NodeRow) => void
   busyIds?: Set<string>
 }) {
+  const [search, setSearch] = useState("")
   const columns: ColumnDef<TableFeatures, NodeRow>[] = [
     {
       accessorKey: "name",
@@ -95,10 +103,24 @@ export function NodesTable({
     },
   ]
 
-  const table = useTable({ data: nodes, columns, features: dataGridFeatures })
+  const table = useTable({
+    data: nodes,
+    columns,
+    features: dataGridFeatures,
+    state: { globalFilter: search },
+    onGlobalFilterChange: setSearch,
+    globalFilterFn: filterFn_includesString,
+  })
 
   return (
     <DataGrid table={table} recordCount={nodes.length}>
+      <div className="flex items-center justify-between gap-2">
+        <GridSearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Filter by name or URL…"
+        />
+      </div>
       <DataGridContainer>
         <DataGridTable />
       </DataGridContainer>

@@ -25,7 +25,7 @@ import {
   StepperTitle,
   StepperSeparator,
 } from "#/components/reui/stepper"
-import { useTable, type ColumnDef, type TableFeatures } from "@tanstack/react-table"
+import { useTable, filterFn_includesString, type ColumnDef, type TableFeatures } from "@tanstack/react-table"
 import {
   dpGet,
   dpRaw,
@@ -41,6 +41,7 @@ import {
 import { Modal } from "#/components/Modal"
 import { ConfirmDialog } from "#/components/ConfirmDialog"
 import { SyncModal } from "#/components/SyncModal"
+import { GridSearchInput } from "#/components/GridSearchInput"
 import { diffLines } from "#/lib/diff"
 
 const TABS = ["overview", "frontends", "backends", "stats", "history", "raw"] as const
@@ -218,6 +219,7 @@ function FrontendsTab({
   onChanged: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [feSearch, setFeSearch] = useState("")
   const columns: ColumnDef<TableFeatures, Frontend>[] = [
     { accessorKey: "name", header: "Name" },
     { accessorKey: "mode", header: "Mode" },
@@ -246,7 +248,14 @@ function FrontendsTab({
       ),
     },
   ]
-  const table = useTable({ data: frontends, columns, features: dataGridFeatures })
+  const table = useTable({
+    data: frontends,
+    columns,
+    features: dataGridFeatures,
+    state: { globalFilter: feSearch },
+    onGlobalFilterChange: setFeSearch,
+    globalFilterFn: filterFn_includesString,
+  })
 
   const removeMut = useMutation({
     mutationFn: (fe: Frontend) =>
@@ -274,7 +283,12 @@ function FrontendsTab({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <GridSearchInput
+          value={feSearch}
+          onChange={setFeSearch}
+          placeholder="Filter frontends…"
+        />
         <Button onClick={() => setOpen(true)}>New frontend</Button>
       </div>
       {loading ? (
@@ -316,6 +330,7 @@ function BackendsTab({
 }) {
   const [open, setOpen] = useState(false)
   const [manage, setManage] = useState<Backend | null>(null)
+  const [beSearch, setBeSearch] = useState("")
   const columns: ColumnDef<TableFeatures, Backend>[] = [
     { accessorKey: "name", header: "Name" },
     { accessorKey: "mode", header: "Mode" },
@@ -348,7 +363,14 @@ function BackendsTab({
       ),
     },
   ]
-  const table = useTable({ data: backends, columns, features: dataGridFeatures })
+  const table = useTable({
+    data: backends,
+    columns,
+    features: dataGridFeatures,
+    state: { globalFilter: beSearch },
+    onGlobalFilterChange: setBeSearch,
+    globalFilterFn: filterFn_includesString,
+  })
 
   const removeMut = useMutation({
     mutationFn: (be: Backend) =>
@@ -381,7 +403,12 @@ function BackendsTab({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <GridSearchInput
+          value={beSearch}
+          onChange={setBeSearch}
+          placeholder="Filter backends…"
+        />
         <Button onClick={() => setOpen(true)}>New backend</Button>
       </div>
       {loading ? (
@@ -639,6 +666,7 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
   const [diffFor, setDiffFor] = useState<ChangeListItem | null>(null)
   const [revertFor, setRevertFor] = useState<ChangeListItem | null>(null)
   const [cleanupFor, setCleanupFor] = useState<"days" | "limit" | null>(null)
+  const [histSearch, setHistSearch] = useState("")
 
   const q = useQuery({
     queryKey: ["changes", nodeId],
@@ -741,7 +769,14 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
       },
     },
   ]
-  const table = useTable({ data: changes, columns, features: dataGridFeatures })
+  const table = useTable({
+    data: changes,
+    columns,
+    features: dataGridFeatures,
+    state: { globalFilter: histSearch },
+    onGlobalFilterChange: setHistSearch,
+    globalFilterFn: filterFn_includesString,
+  })
 
   return (
     <div className="space-y-3">
@@ -754,18 +789,25 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
       )}
       {changes.length > 0 && (
         <>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {total} record{total === 1 ? "" : "s"}
-            </span>
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => setCleanupFor("days")}
-              disabled={cleanupMut.isPending}
-            >
-              Clean up old records
-            </Button>
+          <div className="flex items-center justify-between gap-2">
+            <GridSearchInput
+              value={histSearch}
+              onChange={setHistSearch}
+              placeholder="Filter history…"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {total} record{total === 1 ? "" : "s"}
+              </span>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => setCleanupFor("days")}
+                disabled={cleanupMut.isPending}
+              >
+                Clean up old records
+              </Button>
+            </div>
           </div>
           <DataGrid table={table} recordCount={changes.length}>
             <DataGridContainer>

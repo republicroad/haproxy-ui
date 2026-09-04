@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { NodesTable } from "#/components/NodesTable"
 import { NodeFormDialog } from "#/components/NodeFormDialog"
 import { ConfirmDialog } from "#/components/ConfirmDialog"
+import { NodesImportExportButtons } from "#/components/ImportExportButtons"
 import { Button } from "#/components/ui/button"
 import type { NodeRow } from "#/lib/types"
 
@@ -104,7 +105,8 @@ function NodesPage() {
             Registered HAProxy instances managed via Data Plane API
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <NodesImportExportButtons onChanged={refresh} />
           <Button
             variant="outline"
             onClick={() => testAllMut.mutate()}

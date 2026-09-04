@@ -14,8 +14,11 @@ import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
 import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
+import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
+import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
 import { Route as ApiNodesIdChangesRouteImport } from './routes/api/nodes/$id/changes'
+import { Route as ApiNodesIdConfigRouteImport } from './routes/api/nodes/$id/config'
 import { Route as ApiNodesIdTestRouteImport } from './routes/api/nodes/$id/test'
 import { Route as ApiNodesIdChangesChangeIdRouteImport } from './routes/api/nodes/$id/changes/$changeId'
 import { Route as ApiNodesIdChangesChangeIdRevertRouteImport } from './routes/api/nodes/$id/changes/$changeId/revert'
@@ -45,6 +48,16 @@ const ApiNodesIdRoute = ApiNodesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiNodesRoute,
 } as any)
+const ApiNodesExportRoute = ApiNodesExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => ApiNodesRoute,
+} as any)
+const ApiNodesImportRoute = ApiNodesImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => ApiNodesRoute,
+} as any)
 const ApiDpNodeIdSplatRoute = ApiDpNodeIdSplatRouteImport.update({
   id: '/api/dp/$nodeId/$',
   path: '/api/dp/$nodeId/$',
@@ -53,6 +66,11 @@ const ApiDpNodeIdSplatRoute = ApiDpNodeIdSplatRouteImport.update({
 const ApiNodesIdChangesRoute = ApiNodesIdChangesRouteImport.update({
   id: '/changes',
   path: '/changes',
+  getParentRoute: () => ApiNodesIdRoute,
+} as any)
+const ApiNodesIdConfigRoute = ApiNodesIdConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
   getParentRoute: () => ApiNodesIdRoute,
 } as any)
 const ApiNodesIdTestRoute = ApiNodesIdTestRouteImport.update({
@@ -79,8 +97,11 @@ export interface FileRoutesByFullPath {
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
+  '/api/nodes/export': typeof ApiNodesExportRoute
+  '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
+  '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
@@ -91,8 +112,11 @@ export interface FileRoutesByTo {
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
+  '/api/nodes/export': typeof ApiNodesExportRoute
+  '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
+  '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
@@ -104,8 +128,11 @@ export interface FileRoutesById {
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
+  '/api/nodes/export': typeof ApiNodesExportRoute
+  '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
+  '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
@@ -118,8 +145,11 @@ export interface FileRouteTypes {
     | '/api/nodes'
     | '/nodes/$id'
     | '/api/nodes/$id'
+    | '/api/nodes/export'
+    | '/api/nodes/import'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/changes'
+    | '/api/nodes/$id/config'
     | '/api/nodes/$id/test'
     | '/api/nodes/$id/changes/$changeId'
     | '/api/nodes/$id/changes/$changeId/revert'
@@ -130,8 +160,11 @@ export interface FileRouteTypes {
     | '/api/nodes'
     | '/nodes/$id'
     | '/api/nodes/$id'
+    | '/api/nodes/export'
+    | '/api/nodes/import'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/changes'
+    | '/api/nodes/$id/config'
     | '/api/nodes/$id/test'
     | '/api/nodes/$id/changes/$changeId'
     | '/api/nodes/$id/changes/$changeId/revert'
@@ -142,8 +175,11 @@ export interface FileRouteTypes {
     | '/api/nodes'
     | '/nodes/$id'
     | '/api/nodes/$id'
+    | '/api/nodes/export'
+    | '/api/nodes/import'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/changes'
+    | '/api/nodes/$id/config'
     | '/api/nodes/$id/test'
     | '/api/nodes/$id/changes/$changeId'
     | '/api/nodes/$id/changes/$changeId/revert'
@@ -193,6 +229,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNodesIdRouteImport
       parentRoute: typeof ApiNodesRoute
     }
+    '/api/nodes/export': {
+      id: '/api/nodes/export'
+      path: '/export'
+      fullPath: '/api/nodes/export'
+      preLoaderRoute: typeof ApiNodesExportRouteImport
+      parentRoute: typeof ApiNodesRoute
+    }
+    '/api/nodes/import': {
+      id: '/api/nodes/import'
+      path: '/import'
+      fullPath: '/api/nodes/import'
+      preLoaderRoute: typeof ApiNodesImportRouteImport
+      parentRoute: typeof ApiNodesRoute
+    }
     '/api/dp/$nodeId/$': {
       id: '/api/dp/$nodeId/$'
       path: '/api/dp/$nodeId/$'
@@ -205,6 +255,13 @@ declare module '@tanstack/react-router' {
       path: '/changes'
       fullPath: '/api/nodes/$id/changes'
       preLoaderRoute: typeof ApiNodesIdChangesRouteImport
+      parentRoute: typeof ApiNodesIdRoute
+    }
+    '/api/nodes/$id/config': {
+      id: '/api/nodes/$id/config'
+      path: '/config'
+      fullPath: '/api/nodes/$id/config'
+      preLoaderRoute: typeof ApiNodesIdConfigRouteImport
       parentRoute: typeof ApiNodesIdRoute
     }
     '/api/nodes/$id/test': {
@@ -268,11 +325,13 @@ const ApiNodesIdChangesRouteWithChildren =
 
 interface ApiNodesIdRouteChildren {
   ApiNodesIdChangesRoute: typeof ApiNodesIdChangesRouteWithChildren
+  ApiNodesIdConfigRoute: typeof ApiNodesIdConfigRoute
   ApiNodesIdTestRoute: typeof ApiNodesIdTestRoute
 }
 
 const ApiNodesIdRouteChildren: ApiNodesIdRouteChildren = {
   ApiNodesIdChangesRoute: ApiNodesIdChangesRouteWithChildren,
+  ApiNodesIdConfigRoute: ApiNodesIdConfigRoute,
   ApiNodesIdTestRoute: ApiNodesIdTestRoute,
 }
 
@@ -282,10 +341,14 @@ const ApiNodesIdRouteWithChildren = ApiNodesIdRoute._addFileChildren(
 
 interface ApiNodesRouteChildren {
   ApiNodesIdRoute: typeof ApiNodesIdRouteWithChildren
+  ApiNodesExportRoute: typeof ApiNodesExportRoute
+  ApiNodesImportRoute: typeof ApiNodesImportRoute
 }
 
 const ApiNodesRouteChildren: ApiNodesRouteChildren = {
   ApiNodesIdRoute: ApiNodesIdRouteWithChildren,
+  ApiNodesExportRoute: ApiNodesExportRoute,
+  ApiNodesImportRoute: ApiNodesImportRoute,
 }
 
 const ApiNodesRouteWithChildren = ApiNodesRoute._addFileChildren(

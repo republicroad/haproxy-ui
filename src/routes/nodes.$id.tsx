@@ -42,6 +42,7 @@ import { Modal } from "#/components/Modal"
 import { ConfirmDialog } from "#/components/ConfirmDialog"
 import { SyncModal } from "#/components/SyncModal"
 import { GridSearchInput } from "#/components/GridSearchInput"
+import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
 import { diffLines } from "#/lib/diff"
 
 const TABS = ["overview", "frontends", "backends", "stats", "history", "raw"] as const
@@ -99,6 +100,7 @@ function NodeDetail() {
           <p className="text-muted-foreground">{nodeQ.data?.apiUrl}</p>
         </div>
         <div className="flex items-center gap-2">
+          <NodeConfigImportExportButtons nodeId={id} />
           <Button
             variant="outline"
             size="sm"

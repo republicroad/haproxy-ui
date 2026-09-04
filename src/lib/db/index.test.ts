@@ -1,16 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 type DbModule = typeof import("./index")
 
-async function loadDb(): Promise<DbModule> {
-  const dir = mkdtempSync(join(tmpdir(), "haproxy-ui-test-"))
-  process.env.HAPROXY_UI_DB = join(dir, "test.db")
+let currentDbPath: string | null = null
+
+async function loadDb(dbPath?: string): Promise<DbModule> {
+  const path = dbPath ?? join(mkdtempSync(join(tmpdir(), "haproxy-ui-test-")), "test.db")
+  currentDbPath = path
+  process.env.HAPROXY_UI_DB = path
   delete (globalThis as Record<string, unknown>).__haproxyUiDb
   vi.resetModules()
   return import("./index")
+}
+
+/** Simulate an app restart against the same SQLite file. */
+async function reloadDb(): Promise<DbModule> {
+  if (!currentDbPath) throw new Error("no db loaded yet")
+  return loadDb(currentDbPath)
 }
 
 const node = (id: string, name = "n1") => ({
@@ -72,6 +81,61 @@ describe("db node CRUD", () => {
     dbm.insertNode(node("abc"))
     dbm.deleteNode("abc")
     expect(dbm.getNode("abc")).toBeUndefined()
+  })
+})
+
+describe("db credential encryption", () => {
+  let dbm: DbModule
+  beforeEach(async () => {
+    process.env.HAPROXY_UI_KEY = "test-enc-key"
+    dbm = await loadDb()
+  })
+  afterEach(async () => {
+    delete process.env.HAPROXY_UI_KEY
+  })
+
+  it("stores api_pass encrypted but returns plaintext", () => {
+    dbm.insertNode({ ...node("enc1"), apiPass: "super-secret" })
+    // raw row is encrypted, not plaintext
+    const raw = (
+      dbm.db.prepare("SELECT api_pass FROM nodes WHERE id = ?").get("enc1") as {
+        api_pass: string
+      }
+    ).api_pass
+    expect(raw).not.toBe("super-secret")
+    expect(raw.startsWith("enc:v1:")).toBe(true)
+    // API layer sees plaintext
+    expect(dbm.getNode("enc1")?.apiPass).toBe("super-secret")
+  })
+
+  it("encrypts patched passwords", () => {
+    dbm.insertNode({ ...node("enc2"), apiPass: "first" })
+    dbm.updateNode("enc2", { apiPass: "second" })
+    expect(dbm.getNode("enc2")?.apiPass).toBe("second")
+    const raw = (
+      dbm.db.prepare("SELECT api_pass FROM nodes WHERE id = ?").get("enc2") as {
+        api_pass: string
+      }
+    ).api_pass
+    expect(raw.startsWith("enc:v1:")).toBe(true)
+  })
+
+  it("migrates legacy plaintext rows on startup", async () => {
+    // seed a plaintext row directly, then simulate a fresh boot under key
+    dbm.insertNode({ ...node("legacy"), apiPass: "legacy-secret" })
+    dbm.db
+      .prepare("UPDATE nodes SET api_pass = ? WHERE id = ?")
+      .run("legacy-secret", "legacy") // bypass encryption = simulate legacy row
+
+    // emulate restart: clear singleton + module cache, reimport with key set
+    const migrated = await reloadDb()
+    const raw = (
+      migrated.db.prepare("SELECT api_pass FROM nodes WHERE id = ?").get("legacy") as {
+        api_pass: string
+      }
+    ).api_pass
+    expect(raw.startsWith("enc:v1:")).toBe(true)
+    expect(migrated.getNode("legacy")?.apiPass).toBe("legacy-secret")
   })
 })
 

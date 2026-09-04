@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite"
+import { decryptSecret, encryptSecret, isEncrypted } from "#/lib/crypto"
 
 export type NodeRow = {
   id: string
@@ -48,6 +49,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_changes_node ON config_changes(node_id, ts);
 `)
 
+/** Encrypt any legacy plaintext api_pass values when HAPROXY_UI_KEY is set. */
+function migratePlaintextSecrets(): void {
+  if (!process.env.HAPROXY_UI_KEY) return
+  const rows = db
+    .prepare("SELECT id, api_pass FROM nodes WHERE api_pass NOT LIKE 'enc:v1:%'")
+    .all() as { id: string; api_pass: string }[]
+  for (const r of rows) {
+    if (isEncrypted(r.api_pass)) continue
+    db.prepare("UPDATE nodes SET api_pass = ? WHERE id = ?").run(
+      encryptSecret(r.api_pass),
+      r.id,
+    )
+  }
+}
+migratePlaintextSecrets()
+
 type NodeSqliteRow = {
   id: string
   name: string
@@ -66,7 +83,7 @@ function rowToNode(row: NodeSqliteRow): NodeRow {
     name: row.name,
     apiUrl: row.api_url,
     apiUser: row.api_user,
-    apiPass: row.api_pass,
+    apiPass: decryptSecret(row.api_pass),
     haproxyVersion: row.haproxy_version ?? null,
     status: row.status,
     lastSeen: row.last_seen ?? null,
@@ -90,7 +107,7 @@ export function getNode(id: string): NodeRow | undefined {
 export function insertNode(n: NodeRow): void {
   db.prepare(
     "INSERT INTO nodes (id, name, api_url, api_user, api_pass, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(n.id, n.name, n.apiUrl, n.apiUser, n.apiPass, n.status, n.createdAt)
+  ).run(n.id, n.name, n.apiUrl, n.apiUser, encryptSecret(n.apiPass), n.status, n.createdAt)
 }
 
 export function updateNode(
@@ -113,7 +130,7 @@ export function updateNode(
   }
   if (patch.apiPass !== undefined) {
     sets.push("api_pass = ?")
-    vals.push(patch.apiPass)
+    vals.push(encryptSecret(patch.apiPass))
   }
   if (patch.haproxyVersion !== undefined) {
     sets.push("haproxy_version = ?")

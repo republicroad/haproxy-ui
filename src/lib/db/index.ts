@@ -224,3 +224,33 @@ export function getChange(id: string): ChangeRow | undefined {
 export function markReverted(id: string): void {
   db.prepare("UPDATE config_changes SET reverted = 1 WHERE id = ?").run(id)
 }
+
+export function countChanges(nodeId: string): number {
+  const row = db
+    .prepare("SELECT COUNT(*) AS cnt FROM config_changes WHERE node_id = ?")
+    .get(nodeId) as { cnt: number }
+  return row.cnt
+}
+
+/** Delete change records older than `olderThanTs` (unix ms). Returns deleted count. */
+export function deleteChangesBefore(nodeId: string, olderThanTs: number): number {
+  const r = db
+    .prepare("DELETE FROM config_changes WHERE node_id = ? AND ts < ?")
+    .run(nodeId, olderThanTs)
+  return Number(r.changes)
+}
+
+/** Keep only the latest `keepCount` records per node, delete the rest. Returns deleted count. */
+export function trimChanges(nodeId: string, keepCount: number): number {
+  const ids = db
+    .prepare(
+      "SELECT id FROM config_changes WHERE node_id = ? ORDER BY ts DESC LIMIT -1 OFFSET ?",
+    )
+    .all(nodeId, keepCount) as { id: string }[]
+  if (ids.length === 0) return 0
+  const placeholders = ids.map(() => "?").join(",")
+  const r = db
+    .prepare(`DELETE FROM config_changes WHERE id IN (${placeholders})`)
+    .run(...ids.map((i) => i.id))
+  return Number(r.changes)
+}

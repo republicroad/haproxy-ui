@@ -558,7 +558,10 @@ type ChangeListItem = {
   reverted: number
 }
 
-async function fetchChanges(nodeId: string): Promise<ChangeListItem[]> {
+async function fetchChanges(nodeId: string): Promise<{
+  changes: ChangeListItem[]
+  total: number
+}> {
   const res = await fetch(`/api/nodes/${nodeId}/changes`)
   if (!res.ok) throw new Error("failed to load changes")
   return res.json()
@@ -635,13 +638,15 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
   const qc = useQueryClient()
   const [diffFor, setDiffFor] = useState<ChangeListItem | null>(null)
   const [revertFor, setRevertFor] = useState<ChangeListItem | null>(null)
+  const [cleanupFor, setCleanupFor] = useState<"days" | "limit" | null>(null)
 
   const q = useQuery({
     queryKey: ["changes", nodeId],
     queryFn: () => fetchChanges(nodeId),
     enabled: mounted,
   })
-  const changes = q.data ?? []
+  const changes = q.data?.changes ?? []
+  const total = q.data?.total ?? 0
 
   const revertMut = useMutation({
     mutationFn: async (cid: string) => {
@@ -659,6 +664,27 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
     },
     onError: (e) =>
       toast.error("Revert failed", { description: (e as Error).message }),
+  })
+
+  const cleanupMut = useMutation({
+    mutationFn: async (opts: { days?: number; limit?: number }) => {
+      const params = new URLSearchParams()
+      if (opts.days) params.set("days", String(opts.days))
+      if (opts.limit) params.set("limit", String(opts.limit))
+      const res = await fetch(`/api/nodes/${nodeId}/changes?${params}`, {
+        method: "DELETE",
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? "cleanup failed")
+      return j as { deleted: number; total: number }
+    },
+    onSuccess: (r) => {
+      toast.success(`Cleaned up ${r.deleted} record${r.deleted === 1 ? "" : "s"}`)
+      setCleanupFor(null)
+      qc.invalidateQueries({ queryKey: ["changes", nodeId] })
+    },
+    onError: (e) =>
+      toast.error("Cleanup failed", { description: (e as Error).message }),
   })
 
   const columns: ColumnDef<TableFeatures, ChangeListItem>[] = [
@@ -727,12 +753,27 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
         </p>
       )}
       {changes.length > 0 && (
-        <DataGrid table={table} recordCount={changes.length}>
-          <DataGridContainer>
-            <DataGridTable />
-          </DataGridContainer>
-          <DataGridPagination />
-        </DataGrid>
+        <>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {total} record{total === 1 ? "" : "s"}
+            </span>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => setCleanupFor("days")}
+              disabled={cleanupMut.isPending}
+            >
+              Clean up old records
+            </Button>
+          </div>
+          <DataGrid table={table} recordCount={changes.length}>
+            <DataGridContainer>
+              <DataGridTable />
+            </DataGridContainer>
+            <DataGridPagination />
+          </DataGrid>
+        </>
       )}
 
       {diffFor && (
@@ -755,6 +796,15 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
         pending={revertMut.isPending}
         onCancel={() => setRevertFor(null)}
         onConfirm={() => revertFor && revertMut.mutate(revertFor.id)}
+      />
+      <ConfirmDialog
+        open={cleanupFor === "days"}
+        title="Clean up old records"
+        message="Delete all change records older than 30 days? This cannot be undone."
+        confirmLabel="Delete old records"
+        pending={cleanupMut.isPending}
+        onCancel={() => setCleanupFor(null)}
+        onConfirm={() => cleanupMut.mutate({ days: 30 })}
       />
     </div>
   )

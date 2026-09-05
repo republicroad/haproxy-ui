@@ -562,6 +562,16 @@ export function ServersModal({
   onError: (m: string | null) => void
 }) {
   const [servers, setServers] = useState<Server[] | null>(null)
+  const [editingServer, setEditingServer] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({
+    check: false,
+    interval: "2000",
+    fall: "3",
+    rise: "2",
+    weight: "100",
+  })
+  const [editErr, setEditErr] = useState<string | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
   const [form, setForm] = useState({
     name: "",
     address: "",
@@ -570,6 +580,67 @@ export function ServersModal({
     check: false,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const saveServerCheck = async (s: Server) => {
+    setEditSaving(true)
+    setEditErr(null)
+    const interval = Number(editForm.interval)
+    const fall = Number(editForm.fall)
+    const rise = Number(editForm.rise)
+    const weight = Number(editForm.weight)
+    if (
+      (editForm.interval && (!Number.isInteger(interval) || interval < 250)) ||
+      (editForm.fall && (!Number.isInteger(fall) || fall < 1)) ||
+      (editForm.rise && (!Number.isInteger(rise) || rise < 1)) ||
+      (!Number.isInteger(weight) || weight < 0 || weight > 256)
+    ) {
+      setEditErr("invalid values: interval ≥ 250ms, fall/rise ≥ 1, weight 0-256")
+      setEditSaving(false)
+      return
+    }
+    try {
+      await withTransaction(
+        nodeId,
+        async (tx) => {
+          await dpPut(
+            nodeId,
+            `services/haproxy/configuration/backends/${encodeURIComponent(backend.name)}/servers/${encodeURIComponent(s.name)}`,
+            {
+              check: editForm.check ? "enabled" : "disabled",
+              ...(editForm.check && editForm.interval
+                ? { check_interval: interval }
+                : {}),
+              ...(editForm.check && editForm.fall ? { check_fall: fall } : {}),
+              ...(editForm.check && editForm.rise ? { check_rise: rise } : {}),
+              weight,
+            },
+            tx,
+          )
+        },
+        {
+          kind: "update",
+          resource: "server",
+          target: s.name,
+          parent: backend.name,
+          payload: {
+            check: editForm.check ? "enabled" : "disabled",
+            check_interval: interval,
+            check_fall: fall,
+            check_rise: rise,
+            weight,
+          },
+        },
+      )
+      toast.success(`Check params updated for "${s.name}"`)
+      setEditingServer(null)
+      load.mutate()
+      onChanged()
+    } catch (e) {
+      setEditErr((e as Error).message)
+    } finally {
+      setEditSaving(false)
+    }
+  }
 
   const load = useMutation({
     mutationFn: () =>
@@ -655,17 +726,100 @@ export function ServersModal({
           {(servers ?? []).map((s) => (
             <div
               key={s.name}
-              className="flex items-center justify-between border-b border-border px-3 py-2 text-sm last:border-0"
+              className="border-b border-border px-3 py-2 text-sm last:border-0"
             >
-              <span>
-                <span className="font-medium">{s.name}</span>{" "}
-                <span className="text-muted-foreground">
-                  {s.address}:{s.port} (w{s.weight})
+              <div className="flex items-center justify-between">
+                <span>
+                  <span className="font-medium">{s.name}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {s.address}:{s.port} (w{s.weight})
+                    {s.check === "enabled" && (
+                      <span className="ml-1 text-xs">
+                        · check {s.check_interval ? `${s.check_interval}ms` : "default"}
+                        {` fall=${s.check_fall ?? 3} rise=${s.check_rise ?? 2}`}
+                      </span>
+                    )}
+                  </span>
                 </span>
-              </span>
-              <Button size="sm" variant="destructive" onClick={() => delMut.mutate(s.name)}>
-                Remove
-              </Button>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setEditingServer(editingServer === s.name ? null : s.name)
+                    }
+                  >
+                    {editingServer === s.name ? "Close" : "Edit"}
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => delMut.mutate(s.name)}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+              {editingServer === s.name && (
+                <div className="mt-2 space-y-2 rounded-md border border-border bg-muted/30 p-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={editForm.check}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, check: e.target.checked })
+                        }
+                      />
+                      Health check
+                    </label>
+                    <div>
+                      <input
+                        className={inputCls}
+                        placeholder="interval ms (e.g. 2000)"
+                        value={editForm.interval}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, interval: e.target.value })
+                        }
+                        aria-label="check interval"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        className={inputCls}
+                        placeholder="fall (e.g. 3)"
+                        value={editForm.fall}
+                        onChange={(e) => setEditForm({ ...editForm, fall: e.target.value })}
+                        aria-label="check fall"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        className={inputCls}
+                        placeholder="rise (e.g. 2)"
+                        value={editForm.rise}
+                        onChange={(e) => setEditForm({ ...editForm, rise: e.target.value })}
+                        aria-label="check rise"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        className={inputCls}
+                        placeholder="weight"
+                        value={editForm.weight}
+                        onChange={(e) => setEditForm({ ...editForm, weight: e.target.value })}
+                        aria-label="weight"
+                      />
+                    </div>
+                  </div>
+                  {editErr && <FieldError message={editErr} />}
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      disabled={editSaving}
+                      onClick={() => saveServerCheck(s)}
+                    >
+                      {editSaving ? "Saving…" : "Save check params"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
           {servers && servers.length === 0 && (

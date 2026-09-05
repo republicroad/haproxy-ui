@@ -28,6 +28,9 @@ export type Server = {
   port?: number
   weight?: number
   check?: string
+  check_interval?: number
+  check_fall?: number
+  check_rise?: number
   disabled?: boolean
   backup?: boolean
 }

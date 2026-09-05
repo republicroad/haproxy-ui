@@ -172,6 +172,16 @@ const server = createServer((req, res) => {
         be.servers.push(json)
         return send(res, 201, json)
       }
+      if (method === "PUT" && srvMatch[2]) {
+        const sName = decodeURIComponent(srvMatch[2])
+        const s = (be.servers || []).find((x) => x.name === sName)
+        if (!s) return send(res, 404, { code: 404, message: "server not found" })
+        // provided-field update (check params, port, weight, address...)
+        be.servers = (be.servers || []).map((x) =>
+          x.name === sName ? { ...x, ...json, name: sName } : x,
+        )
+        return send(res, 200, be.servers.find((x) => x.name === sName))
+      }
       if (method === "DELETE" && srvMatch[2]) {
         const sName = decodeURIComponent(srvMatch[2])
         be.servers = be.servers.filter((s) => s.name !== sName)

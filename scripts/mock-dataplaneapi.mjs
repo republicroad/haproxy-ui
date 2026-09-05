@@ -8,6 +8,18 @@ const frontends = []
 const backends = new Map()
 const acls = new Map() // "frontend|name" / "backend|name" -> acl[]
 const runtimeMaps = new Map() // map name -> [{id,key,value}]
+const sslCerts = [
+  {
+    name: "example.pem",
+    description: "self-signed sample",
+    pem: `-----BEGIN CERTIFICATE-----
+MIIB0zCCAX2gAwIBAgIUKvYuS9k0o1_example_sample_cert_data_QQowDQYJ
+KoZIhvcNAQELBQAwGDEWMBQGA1UEAwwNYXJjaGl0ZWN0dXJlMB4XDTI0MDEwMTAw
+MDAwMFoXDTI1MDEwMTAwMDAwMFowGDEWMBQGA1UEAwwNYXJjaGl0ZWN0dXJlMBww
+GgYJKoZIhvcNAQkBFg10ZXN0QGV4YW1wbGUuY29tMBwwGgYJKoZIhvcNAQkBFg10
+-----END CERTIFICATE-----`,
+  },
+]
 
 function runtimeServer(beName, s) {
   const admin = s.admin_state ?? "ready"
@@ -50,7 +62,10 @@ const server = createServer((req, res) => {
     try {
       if (body) json = JSON.parse(body)
     } catch {
-      return send(res, 400, { code: 400, message: "bad json" })
+      // raw-body endpoints (PEM upload) carry non-JSON payloads
+      if (!(p === "services/haproxy/storage/ssl" && method === "POST")) {
+        return send(res, 400, { code: 400, message: "bad json" })
+      }
     }
 
     // transactions
@@ -235,6 +250,35 @@ const server = createServer((req, res) => {
       }
       if (method === "DELETE" && ruleMatch[3] !== undefined) {
         list.splice(Number(ruleMatch[3]), 1)
+        return send(res, 202, {})
+      }
+    }
+
+    // SSL storage (simplified: the app's cert wrapper posts raw PEM with
+    // ?name=; the real dataplaneapi uses multipart uploads)
+    if (p === "services/haproxy/storage/ssl" && method === "GET") {
+      return send(res, 200, sslCerts.map((c) => ({
+        id: c.name,
+        storage_name: c.name,
+        description: c.description ?? "",
+      })))
+    }
+    if (p === "services/haproxy/storage/ssl" && method === "POST") {
+      const name = url.searchParams.get("name") ?? `cert_${Date.now()}`
+      if (sslCerts.some((c) => c.name === name)) {
+        return send(res, 409, { code: 409, message: "certificate already exists" })
+      }
+      sslCerts.push({ name, pem: body, description: `uploaded ${new Date().toISOString()}` })
+      return send(res, 201, { id: name, storage_name: name })
+    }
+    const sslMatch = p.match(/^services\/haproxy\/storage\/ssl\/([^/]+)$/)
+    if (sslMatch) {
+      const name = decodeURIComponent(sslMatch[1])
+      const cert = sslCerts.find((c) => c.name === name)
+      if (!cert) return send(res, 404, { code: 404, message: "certificate not found" })
+      if (method === "GET") return send(res, 200, cert.pem)
+      if (method === "DELETE") {
+        sslCerts.splice(sslCerts.indexOf(cert), 1)
         return send(res, 202, {})
       }
     }

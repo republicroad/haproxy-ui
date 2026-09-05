@@ -30,6 +30,7 @@ import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
 import { Route as ApiUsersUsernameRouteImport } from './routes/api/users/$username'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
+import { Route as ApiNodesIdCertsRouteImport } from './routes/api/nodes/$id/certs'
 import { Route as ApiNodesIdChangesRouteImport } from './routes/api/nodes/$id/changes'
 import { Route as ApiNodesIdConfigRouteImport } from './routes/api/nodes/$id/config'
 import { Route as ApiNodesIdTestRouteImport } from './routes/api/nodes/$id/test'
@@ -141,6 +142,11 @@ const ApiDpNodeIdSplatRoute = ApiDpNodeIdSplatRouteImport.update({
   path: '/api/dp/$nodeId/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNodesIdCertsRoute = ApiNodesIdCertsRouteImport.update({
+  id: '/certs',
+  path: '/certs',
+  getParentRoute: () => ApiNodesIdRoute,
+} as any)
 const ApiNodesIdChangesRoute = ApiNodesIdChangesRouteImport.update({
   id: '/changes',
   path: '/changes',
@@ -191,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
+  '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
@@ -218,6 +225,7 @@ export interface FileRoutesByTo {
   '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
+  '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
+  '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
     | '/api/nodes/import'
     | '/api/users/$username'
     | '/api/dp/$nodeId/$'
+    | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
     | '/api/nodes/$id/test'
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/api/nodes/import'
     | '/api/users/$username'
     | '/api/dp/$nodeId/$'
+    | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
     | '/api/nodes/$id/test'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/nodes/import'
     | '/api/users/$username'
     | '/api/dp/$nodeId/$'
+    | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
     | '/api/nodes/$id/test'
@@ -505,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDpNodeIdSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/nodes/$id/certs': {
+      id: '/api/nodes/$id/certs'
+      path: '/certs'
+      fullPath: '/api/nodes/$id/certs'
+      preLoaderRoute: typeof ApiNodesIdCertsRouteImport
+      parentRoute: typeof ApiNodesIdRoute
+    }
     '/api/nodes/$id/changes': {
       id: '/api/nodes/$id/changes'
       path: '/changes'
@@ -581,12 +600,14 @@ const ApiNodesIdChangesRouteWithChildren =
   ApiNodesIdChangesRoute._addFileChildren(ApiNodesIdChangesRouteChildren)
 
 interface ApiNodesIdRouteChildren {
+  ApiNodesIdCertsRoute: typeof ApiNodesIdCertsRoute
   ApiNodesIdChangesRoute: typeof ApiNodesIdChangesRouteWithChildren
   ApiNodesIdConfigRoute: typeof ApiNodesIdConfigRoute
   ApiNodesIdTestRoute: typeof ApiNodesIdTestRoute
 }
 
 const ApiNodesIdRouteChildren: ApiNodesIdRouteChildren = {
+  ApiNodesIdCertsRoute: ApiNodesIdCertsRoute,
   ApiNodesIdChangesRoute: ApiNodesIdChangesRouteWithChildren,
   ApiNodesIdConfigRoute: ApiNodesIdConfigRoute,
   ApiNodesIdTestRoute: ApiNodesIdTestRoute,

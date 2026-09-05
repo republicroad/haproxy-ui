@@ -47,11 +47,12 @@ import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
 import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
 import { TrafficTab } from "#/components/TrafficTab"
 import { StickTablesTab } from "#/components/StickTablesTab"
+import { CertificatesTab } from "#/components/CertificatesTab"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 import { POLL } from "#/lib/poll"
 import { diffLines } from "#/lib/diff"
 
-const TABS = ["overview", "frontends", "backends", "traffic", "acls", "maps", "stats", "stick", "history", "raw"] as const
+const TABS = ["overview", "frontends", "backends", "traffic", "acls", "maps", "certs", "stats", "stick", "history", "raw"] as const
 type Tab = (typeof TABS)[number]
 
 async function fetchNode(id: string): Promise<NodeRow> {
@@ -183,6 +184,8 @@ function NodeDetail() {
       )}
 
       {tab === "maps" && <MapsTab nodeId={id} />}
+
+      {tab === "certs" && <CertificatesTab nodeId={id} />}
 
       {tab === "traffic" && <TrafficTab nodeId={id} />}
 

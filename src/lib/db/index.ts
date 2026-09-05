@@ -78,6 +78,14 @@ try {
   // already migrated
 }
 
+// Kick off the background maintenance scheduler (retention, backups).
+// Dynamic import so the module itself stays test-friendly; unref'd timers.
+if (typeof window === "undefined") {
+  import("#/lib/maintenance")
+    .then((m) => m.startMaintenance())
+    .catch(() => {})
+}
+
 /** Encrypt any legacy plaintext api_pass values when HAPROXY_UI_KEY is set. */
 function migratePlaintextSecrets(): void {
   if (!process.env.HAPROXY_UI_KEY) return

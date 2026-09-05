@@ -11,6 +11,17 @@ const runtimeMaps = new Map() // map name -> [{id,key,value}]
 const userlists = [
   { name: "api_users", users: [{ username: "demo", password: "demopass", inactive: false, is_encrypted: false }] },
 ]
+const resolversStore = [
+  {
+    name: "local_dns",
+    nameservers: [{ name: "ns1", address: "127.0.0.11:53" }],
+    accepted_payload_size: 8192,
+    hold_valid: "10s",
+    hold_obsolete: "15s",
+    hold_refresh: "30s",
+    hold_retry: "1s",
+  },
+]
 const sslCerts = [
   {
     name: "example.pem",
@@ -292,6 +303,34 @@ const server = createServer((req, res) => {
       if (method === "GET") return send(res, 200, cert.pem)
       if (method === "DELETE") {
         sslCerts.splice(sslCerts.indexOf(cert), 1)
+        return send(res, 202, {})
+      }
+    }
+
+    // resolvers configuration (global objects)
+    if (p === "services/haproxy/configuration/resolvers" && method === "GET") {
+      return send(res, 200, resolversStore)
+    }
+    if (p === "services/haproxy/configuration/resolvers" && method === "POST") {
+      if (resolversStore.some((r) => r.name === json.name)) {
+        return send(res, 409, { code: 409, message: "resolver already exists" })
+      }
+      const r = { name: json.name, ...json }
+      resolversStore.push(r)
+      return send(res, 201, r)
+    }
+    const resMatch = p.match(/^services\/haproxy\/configuration\/resolvers\/([^/]+)$/)
+    if (resMatch) {
+      const name = decodeURIComponent(resMatch[1])
+      const r = resolversStore.find((x) => x.name === name)
+      if (!r) return send(res, 404, { code: 404, message: "resolver not found" })
+      if (method === "GET") return send(res, 200, r)
+      if (method === "PUT") {
+        Object.assign(r, json, { name })
+        return send(res, 200, r)
+      }
+      if (method === "DELETE") {
+        resolversStore.splice(resolversStore.indexOf(r), 1)
         return send(res, 202, {})
       }
     }

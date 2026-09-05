@@ -7,6 +7,7 @@ import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { Label } from "#/components/ui/label"
 import { ConfirmDialog } from "./ConfirmDialog"
+import { ResolversPanel } from "./ResolversPanel"
 import { dpGet, dpPost, dpDelete, withTransaction } from "#/lib/dataplane/client"
 
 type HAUser = { username: string; password?: string; inactive?: boolean }
@@ -261,6 +262,8 @@ export function UserlistsTab({ nodeId }: { nodeId: string }) {
           </div>
         </>
       )}
+
+      <ResolversPanel nodeId={nodeId} />
 
       <ConfirmDialog
         open={Boolean(deletingList)}

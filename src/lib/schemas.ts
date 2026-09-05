@@ -76,12 +76,23 @@ export const backendInputSchema = z.object({
 
 export const changeMetaSchema = z.object({
   kind: z.enum(["create", "delete"]),
-  resource: z.enum(["frontend", "backend", "server"]),
+  resource: z.enum(["frontend", "backend", "server", "acl", "map"]),
   target: z.string().trim().min(1),
   parent: z.string().trim().optional(),
   payload: z.unknown().optional(),
   txId: z.string().trim().optional(),
   rawAfter: z.string().max(200_000).optional(),
+})
+
+export const aclInputSchema = z.object({
+  acl_name: z.string().trim().min(1, "acl_name is required"),
+  criterion: z.string().trim().min(1, "criterion is required"),
+  value: z.string().trim().optional(),
+})
+
+export const mapEntryInputSchema = z.object({
+  key: z.string().trim().min(1, "key is required"),
+  value: z.string().trim().min(1, "value is required"),
 })
 
 /** Flatten a ZodError into { field: message } for API responses / form display. */

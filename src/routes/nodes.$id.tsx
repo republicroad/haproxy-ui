@@ -43,9 +43,10 @@ import { ConfirmDialog } from "#/components/ConfirmDialog"
 import { SyncModal } from "#/components/SyncModal"
 import { GridSearchInput } from "#/components/GridSearchInput"
 import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
+import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
 import { diffLines } from "#/lib/diff"
 
-const TABS = ["overview", "frontends", "backends", "stats", "history", "raw"] as const
+const TABS = ["overview", "frontends", "backends", "acls", "maps", "stats", "history", "raw"] as const
 type Tab = (typeof TABS)[number]
 
 async function fetchNode(id: string): Promise<NodeRow> {
@@ -160,6 +161,17 @@ function NodeDetail() {
           onChanged={refetch}
         />
       )}
+
+      {tab === "acls" && (
+        <AclsTab
+          nodeId={id}
+          frontends={feQ.data ?? []}
+          backends={beQ.data ?? []}
+          onChanged={refetch}
+        />
+      )}
+
+      {tab === "maps" && <MapsTab nodeId={id} />}
 
       {tab === "stats" && (
         <StatsTab nodeId={id} backends={beQ.data ?? []} loading={beQ.isLoading} />
@@ -752,7 +764,10 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
       header: "",
       cell: ({ row }) => {
         const c = row.original
-        const revertable = !c.reverted && (c.kind === "create" || c.kind === "delete")
+        const revertable =
+          !c.reverted &&
+          (c.kind === "create" || c.kind === "delete") &&
+          ["frontend", "backend", "server"].includes(c.resource)
         return (
           <div className="flex justify-end gap-1">
             <Button size="xs" variant="outline" onClick={() => setDiffFor(c)}>

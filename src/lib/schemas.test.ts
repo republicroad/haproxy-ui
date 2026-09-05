@@ -177,9 +177,24 @@ describe("changeMetaSchema", () => {
         .success,
     ).toBe(false)
     expect(
-      changeMetaSchema.safeParse({ kind: "create", resource: "acl", target: "x" })
+      changeMetaSchema.safeParse({ kind: "create", resource: "table", target: "x" })
         .success,
     ).toBe(false)
+  })
+
+  it("accepts acl/map resources introduced for the ACL/Maps tabs", () => {
+    expect(
+      changeMetaSchema.safeParse({
+        kind: "create",
+        resource: "acl",
+        target: "is_admin",
+        parent: "frontend/fe_web",
+      }).success,
+    ).toBe(true)
+    expect(
+      changeMetaSchema.safeParse({ kind: "delete", resource: "map", target: "hosts.map" })
+        .success,
+    ).toBe(true)
   })
 
   it("rejects rawAfter over 200KB", () => {

@@ -6,6 +6,8 @@ const PASS = process.env.MOCK_PASS ?? "admin"
 
 const frontends = []
 const backends = new Map()
+const acls = new Map() // "frontend|name" / "backend|name" -> acl[]
+const runtimeMaps = new Map() // map name -> [{id,key,value}]
 
 function send(res, status, body) {
   const payload = typeof body === "string" ? body : JSON.stringify(body)
@@ -148,6 +150,64 @@ const server = createServer((req, res) => {
         id: "1",
       }))
       return send(res, 200, runtime)
+    }
+
+    // config ACLs per parent section (frontend/backend)
+    const aclMatch = p.match(
+      /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/acls\/?(\d+)?$/,
+    )
+    if (aclMatch) {
+      const key = `${aclMatch[1]}|${decodeURIComponent(aclMatch[2])}`
+      if (!acls.has(key)) acls.set(key, [])
+      const list = acls.get(key)
+      if (method === "GET" && aclMatch[3] === undefined) {
+        return send(res, 200, list)
+      }
+      if (method === "POST") {
+        list.push(json)
+        return send(res, 201, json)
+      }
+      if (method === "DELETE" && aclMatch[3] !== undefined) {
+        list.splice(Number(aclMatch[3]), 1)
+        return send(res, 202, {})
+      }
+    }
+
+    // runtime maps: list + per-map entry CRUD
+    if (p === "services/haproxy/runtime/maps" && method === "GET") {
+      return send(res, 200, [...runtimeMaps.keys()].map((name) => ({
+        id: name,
+        file: `/etc/haproxy/maps/${name}`,
+        storage_name: name,
+        description: `mock map ${name}`,
+      })))
+    }
+    const mapListMatch = p.match(/^services\/haproxy\/runtime\/maps\/([^/]+)\/entries\/?([^/]+)?$/)
+    if (mapListMatch) {
+      const name = decodeURIComponent(mapListMatch[1])
+      if (!runtimeMaps.has(name)) runtimeMaps.set(name, [])
+      const entries = runtimeMaps.get(name)
+      if (method === "GET" && mapListMatch[2] === undefined) {
+        return send(res, 200, entries)
+      }
+      if (method === "POST") {
+        const entry = { id: json.key, key: json.key, value: json.value }
+        entries.push(entry)
+        return send(res, 201, entry)
+      }
+      const eid = mapListMatch[2] ? decodeURIComponent(mapListMatch[2]) : null
+      if (method === "PUT" && eid) {
+        const e = entries.find((x) => x.id === eid)
+        if (!e) return send(res, 404, { code: 404, message: "entry not found" })
+        e.value = json.value
+        return send(res, 200, e)
+      }
+      if (method === "DELETE" && eid) {
+        const i = entries.findIndex((x) => x.id === eid)
+        if (i < 0) return send(res, 404, { code: 404, message: "entry not found" })
+        entries.splice(i, 1)
+        return send(res, 202, {})
+      }
     }
 
     return send(res, 404, { code: 404, message: `no mock for ${method} ${p}` })

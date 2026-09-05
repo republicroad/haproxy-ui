@@ -8,6 +8,9 @@ const frontends = []
 const backends = new Map()
 const acls = new Map() // "frontend|name" / "backend|name" -> acl[]
 const runtimeMaps = new Map() // map name -> [{id,key,value}]
+const userlists = [
+  { name: "api_users", users: [{ username: "demo", password: "demopass", inactive: false, is_encrypted: false }] },
+]
 const sslCerts = [
   {
     name: "example.pem",
@@ -289,6 +292,54 @@ const server = createServer((req, res) => {
       if (method === "GET") return send(res, 200, cert.pem)
       if (method === "DELETE") {
         sslCerts.splice(sslCerts.indexOf(cert), 1)
+        return send(res, 202, {})
+      }
+    }
+
+    // userlists (+users) configuration
+    if (p === "services/haproxy/configuration/userlists" && method === "GET") {
+      return send(res, 200, userlists.map((u) => ({ name: u.name, users: u.users })))
+    }
+    if (p === "services/haproxy/configuration/userlists" && method === "POST") {
+      if (userlists.some((u) => u.name === json.name)) {
+        return send(res, 409, { code: 409, message: "userlist already exists" })
+      }
+      userlists.push({ name: json.name, users: [] })
+      return send(res, 201, { name: json.name })
+    }
+    const ulMatch = p.match(
+      /^services\/haproxy\/configuration\/userlists\/([^/]+)\/users\/?([^/]+)?$/,
+    )
+    if (ulMatch) {
+      const name = decodeURIComponent(ulMatch[1])
+      const ul = userlists.find((u) => u.name === name)
+      if (!ul) return send(res, 404, { code: 404, message: "userlist not found" })
+      if (method === "GET" && ulMatch[2] === undefined) {
+        return send(res, 200, ul.users)
+      }
+      if (method === "POST") {
+        if (ul.users.some((x) => x.username === json.username)) {
+          return send(res, 409, { code: 409, message: "user already exists" })
+        }
+        ul.users.push(json)
+        return send(res, 201, json)
+      }
+      const uname = ulMatch[2] ? decodeURIComponent(ulMatch[2]) : null
+      if (method === "DELETE" && uname) {
+        const i = ul.users.findIndex((x) => x.username === uname)
+        if (i < 0) return send(res, 404, { code: 404, message: "user not found" })
+        ul.users.splice(i, 1)
+        return send(res, 202, {})
+      }
+    }
+    const ulListMatch = p.match(/^services\/haproxy\/configuration\/userlists\/([^/]+)$/)
+    if (ulListMatch) {
+      const name = decodeURIComponent(ulListMatch[1])
+      const ul = userlists.find((u) => u.name === name)
+      if (!ul) return send(res, 404, { code: 404, message: "userlist not found" })
+      if (method === "GET") return send(res, 200, ul)
+      if (method === "DELETE") {
+        userlists.splice(userlists.indexOf(ul), 1)
         return send(res, 202, {})
       }
     }

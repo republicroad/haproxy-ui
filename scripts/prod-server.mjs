@@ -43,6 +43,19 @@ const MIME = {
   ".wasm": "application/wasm",
 }
 
+const SECURITY_HEADERS = {
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=()",
+}
+
+function applySecurityHeaders(nodeRes) {
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!nodeRes.getHeader(k)) nodeRes.setHeader(k, v)
+  }
+}
+
 function serveStatic(urlPath, res) {
   if (urlPath.includes("..")) return false
   const rel = normalize(urlPath).replace(/^([/\\])+/, "")
@@ -51,6 +64,7 @@ function serveStatic(urlPath, res) {
   if (!existsSync(filePath) || !statSync(filePath).isFile()) return false
   const type = MIME[extname(filePath).toLowerCase()] ?? "application/octet-stream"
   const immutable = rel.startsWith(`assets${sep}`) || rel.startsWith("assets/")
+  applySecurityHeaders(res)
   res.writeHead(200, {
     "content-type": type,
     "cache-control": immutable ? "public, max-age=31536000, immutable" : "public, max-age=0, must-revalidate",
@@ -88,6 +102,7 @@ async function sendResponse(nodeRes, webRes) {
     if (k.toLowerCase() === "set-cookie") headers[k] = [headers[k], v].flat().filter(Boolean)
     else headers[k] = v
   })
+  applySecurityHeaders(nodeRes)
   nodeRes.writeHead(webRes.status, headers)
   if (!webRes.body) {
     nodeRes.end()
@@ -116,6 +131,7 @@ const server = createServer(async (req, res) => {
     await sendResponse(res, response)
   } catch (e) {
     console.error("[prod-server] request failed:", e)
+    applySecurityHeaders(res)
     if (!res.headersSent) {
       res.writeHead(500, { "content-type": "application/json" })
     }

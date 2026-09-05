@@ -117,7 +117,8 @@ export function readSessionCookie(request: Request): string | undefined {
 }
 
 export function sessionSetCookieHeader(username: string): string {
-  return `${SESSION_COOKIE}=${createSessionToken(username)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}`
+  const secure = process.env.HAPROXY_UI_COOKIE_SECURE === "true" ? "; Secure" : ""
+  return `${SESSION_COOKIE}=${createSessionToken(username)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}${secure}`
 }
 
 export function sessionClearCookieHeader(): string {
@@ -139,6 +140,54 @@ export function actorFromRequest(request: Request): string | null {
 export function roleFromRequest(request: Request): Role | null {
   if (!authEnabled()) return "admin"
   return sessionFromRequest(request)?.role ?? null
+}
+
+// --- hardening ---
+
+const SECURITY_HEADERS: Record<string, string> = {
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=()",
+}
+
+/** Return a copy of `res` with the standard security headers applied. */
+export function withSecurityHeaders(res: Response): Response {
+  const headers = new Headers(res.headers)
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(k)) headers.set(k, v)
+  }
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+}
+
+/**
+ * CSRF defense-in-depth for state-changing requests: when the browser
+ * supplies an Origin (or Referer) header it must match the request host.
+ * Absent headers (curl, server-to-server) are allowed - CSRF relies on
+ * the browser auto-attaching cookies, which non-browser clients don't do.
+ */
+export function isCrossSiteWrite(request: Request): boolean {
+  const method = request.method.toUpperCase()
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return false
+  const url = new URL(request.url)
+  const origin = request.headers.get("origin")
+  if (origin) {
+    try {
+      if (new URL(origin).host !== url.host) return true
+    } catch {
+      return true
+    }
+  } else {
+    const referer = request.headers.get("referer")
+    if (referer) {
+      try {
+        if (new URL(referer).host !== url.host) return true
+      } catch {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 // --- password hashing (scrypt) ---

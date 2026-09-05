@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
+import { Route as NodesIndexRouteImport } from './routes/nodes.index'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
@@ -47,6 +48,11 @@ const ApiNodesRoute = ApiNodesRouteImport.update({
   id: '/api/nodes',
   path: '/api/nodes',
   getParentRoute: () => rootRouteImport,
+} as any)
+const NodesIndexRoute = NodesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => NodesRoute,
 } as any)
 const NodesIdRoute = NodesIdRouteImport.update({
   id: '/$id',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/nodes': typeof NodesRouteWithChildren
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
+  '/nodes/': typeof NodesIndexRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
@@ -144,9 +151,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/nodes': typeof NodesRouteWithChildren
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
+  '/nodes': typeof NodesIndexRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
@@ -168,6 +175,7 @@ export interface FileRoutesById {
   '/nodes': typeof NodesRouteWithChildren
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
+  '/nodes/': typeof NodesIndexRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
@@ -190,6 +198,7 @@ export interface FileRouteTypes {
     | '/nodes'
     | '/api/nodes'
     | '/nodes/$id'
+    | '/nodes/'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
@@ -207,9 +216,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/nodes'
     | '/api/nodes'
     | '/nodes/$id'
+    | '/nodes'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
@@ -230,6 +239,7 @@ export interface FileRouteTypes {
     | '/nodes'
     | '/api/nodes'
     | '/nodes/$id'
+    | '/nodes/'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
@@ -286,6 +296,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/nodes'
       preLoaderRoute: typeof ApiNodesRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/nodes/': {
+      id: '/nodes/'
+      path: '/'
+      fullPath: '/nodes/'
+      preLoaderRoute: typeof NodesIndexRouteImport
+      parentRoute: typeof NodesRoute
     }
     '/nodes/$id': {
       id: '/nodes/$id'
@@ -390,10 +407,12 @@ declare module '@tanstack/react-router' {
 
 interface NodesRouteChildren {
   NodesIdRoute: typeof NodesIdRoute
+  NodesIndexRoute: typeof NodesIndexRoute
 }
 
 const NodesRouteChildren: NodesRouteChildren = {
   NodesIdRoute: NodesIdRoute,
+  NodesIndexRoute: NodesIndexRoute,
 }
 
 const NodesRouteWithChildren = NodesRoute._addFileChildren(NodesRouteChildren)

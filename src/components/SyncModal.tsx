@@ -16,7 +16,7 @@ import {
 } from "#/components/ui/select"
 import { withTransaction, dpGet, dpPost, dpDelete } from "#/lib/dataplane/client"
 import { normalizeFrontends, normalizeBackends, serversOf } from "#/lib/normalize"
-import type { NodeRow, Frontend, Backend } from "#/lib/types"
+import type { NodeRow, Frontend, Backend, Server } from "#/lib/types"
 
 type SyncResult = {
   node: string
@@ -70,7 +70,19 @@ export function SyncModal({
   const syncMut = useMutation({
     mutationFn: async () => {
       const fes = frontends.filter((f) => feSel.has(f.name))
-      const bes = backends.filter((b) => beSel.has(b.name))
+      // Real dataplaneapi does not embed servers in the backends collection;
+      // fetch each selected backend's servers from the sub-endpoint.
+      const bes = await Promise.all(
+        backends
+          .filter((b) => beSel.has(b.name))
+          .map(async (b) => ({
+            ...b,
+            servers: await dpGet<Server[]>(
+              nodeId,
+              `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}/servers`,
+            ).catch(() => []),
+          })),
+      )
       const out: SyncResult[] = []
       for (const t of targets) {
         const r: SyncResult = { node: t, created: [], skipped: [] }

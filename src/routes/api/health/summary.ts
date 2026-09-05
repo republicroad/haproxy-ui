@@ -72,10 +72,13 @@ async function serverStates(
   nodeId: string,
 ): Promise<{ backend: string; server: string; state: string }[]> {
   const out: { backend: string; server: string; state: string }[] = []
+  // The backends list is read from the configuration endpoints — real
+  // dataplaneapi has no GET /runtime/backends collection. It also does not
+  // embed servers there, but the names are enough to query runtime states.
   const res = await proxyToNode(
     nodeId,
     new Request("http://internal/stats", { method: "GET" }),
-    "services/haproxy/runtime/backends",
+    "services/haproxy/configuration/backends",
   )
   if (!res.ok) return out
   const text = await res.text()
@@ -90,7 +93,7 @@ async function serverStates(
   }
   await Promise.all(
     backends.slice(0, 50).map(async (b) => {
-      if (!b.name) return
+      if (!b.name || b.name.startsWith("_")) return
       try {
         const sres = await proxyToNode(
           nodeId,

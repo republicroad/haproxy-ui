@@ -1,7 +1,7 @@
 import { getNode } from "#/lib/db"
 import { proxyToNode } from "#/lib/dataplane/proxy"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
-import type { Frontend, Backend } from "#/lib/types"
+import type { Frontend, Backend, Server } from "#/lib/types"
 
 async function dpJson<T>(
   nodeId: string,
@@ -29,6 +29,18 @@ function unwrap<T>(x: T | { data: T } | null): T | null {
   return x as T
 }
 
+async function fetchServers(
+  nodeId: string,
+  backendName: string,
+): Promise<Server[]> {
+  const res = await dpJson<Server[]>(
+    nodeId,
+    `services/haproxy/configuration/backends/${encodeURIComponent(backendName)}/servers`,
+  )
+  const servers = unwrap(res.json)
+  return Array.isArray(servers) ? servers : []
+}
+
 export type ConfigBundle = {
   exportedAt: string
   sourceNode: { name: string; apiUrl: string }
@@ -49,20 +61,25 @@ export async function exportNodeConfig(nodeId: string): Promise<
   if (!fes || !bes) return { ok: false, error: "cannot reach dataplaneapi" }
   const nFes = normalizeFrontends(fes)
   const nBes = normalizeBackends(bes)
+  // Real dataplaneapi does NOT embed servers in the backends collection —
+  // fetch them per backend (both mock and real API serve the sub-endpoint).
+  const besWithServers = await Promise.all(
+    nBes
+      .filter((b) => !b.name.startsWith("_"))
+      .map(async (b) => ({
+        ...b,
+        servers: (await fetchServers(nodeId, b.name).catch(() => [])).filter(
+          (s) => !String(s.name).startsWith("_"),
+        ),
+      })),
+  )
   return {
     ok: true,
     bundle: {
       exportedAt: new Date().toISOString(),
       sourceNode: { name: node.name, apiUrl: node.apiUrl },
       frontends: nFes.filter((f) => !f.name.startsWith("_")),
-      backends: nBes
-        .filter((b) => !b.name.startsWith("_"))
-        .map((b) => ({
-          ...b,
-          servers: (Array.isArray(b.servers) ? b.servers : []).filter(
-            (s) => !String(s.name).startsWith("_"),
-          ),
-        })),
+      backends: besWithServers,
     },
   }
 }

@@ -10,6 +10,8 @@ COPY haproxy.cfg /etc/haproxy/haproxy.cfg
 COPY dataplaneapi.yml /etc/haproxy/dataplaneapi.yml
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+COPY reload.sh /reload.sh
+RUN chmod +x /reload.sh
 
 EXPOSE 5555 8404 8080
 

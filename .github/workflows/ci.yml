@@ -30,3 +30,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Production server smoke
+        run: |
+          node scripts/prod-server.mjs &
+          sleep 5
+          curl -sf http://localhost:3000/api/auth/status
+          curl -sf -o /dev/null http://localhost:3000/assets -H "Accept: text/html" || true
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/)
+          [ "$STATUS" = "200" ] || (echo "expected 200 for /, got $STATUS" && exit 1)

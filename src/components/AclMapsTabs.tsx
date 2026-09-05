@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "#/components/ui/select"
 import { dpGet, dpPost, dpDelete, dpPut, withTransaction } from "#/lib/dataplane/client"
+import { LogTargetsPanel } from "./LogTargetsPanel"
 import type { Frontend, Backend } from "#/lib/types"
 import { aclInputSchema, mapEntryInputSchema, fieldErrors } from "#/lib/schemas"
 
@@ -478,6 +479,8 @@ export function AclsTab({
           recorded in history.
         </p>
       </div>
+
+      <LogTargetsPanel nodeId={nodeId} parentType={parentType} parentName={effectiveName} />
     </div>
   )
 }

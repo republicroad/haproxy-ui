@@ -344,6 +344,27 @@ const server = createServer((req, res) => {
       }
     }
 
+    // log targets per parent section (frontend/backend)
+    const logMatch = p.match(
+      /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/logs\/?(\d+)?$/,
+    )
+    if (logMatch) {
+      const key = `logs|${logMatch[1]}|${decodeURIComponent(logMatch[2])}`
+      if (!acls.has(key)) acls.set(key, [])
+      const list = acls.get(key)
+      if (method === "GET" && logMatch[3] === undefined) {
+        return send(res, 200, list)
+      }
+      if (method === "POST") {
+        list.push(json)
+        return send(res, 201, json)
+      }
+      if (method === "DELETE" && logMatch[3] !== undefined) {
+        list.splice(Number(logMatch[3]), 1)
+        return send(res, 202, {})
+      }
+    }
+
     const aclMatch = p.match(
       /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/acls\/?(\d+)?$/,
     )

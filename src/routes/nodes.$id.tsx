@@ -31,6 +31,7 @@ import {
   dpRaw,
   withTransaction,
   dpDelete,
+  dpPut,
 } from "#/lib/dataplane/client"
 import type { NodeRow, Frontend, Backend } from "#/lib/types"
 import {
@@ -525,6 +526,29 @@ function StatsTab({
   })
 
   const rows = statsQ.data ?? []
+  const qc = useQueryClient()
+  const stateMut = useMutation({
+    mutationFn: async (v: {
+      backend: string
+      server: string
+      admin_state: "ready" | "drain" | "maint"
+    }) => {
+      await dpPut(
+        nodeId,
+        `services/haproxy/runtime/backends/${encodeURIComponent(v.backend)}/servers/${encodeURIComponent(v.server)}`,
+        { admin_state: v.admin_state },
+      )
+    },
+    onSuccess: (_, v) => {
+      toast.success(`${v.server} → ${v.admin_state}`)
+      qc.invalidateQueries({ queryKey: ["runtime-servers", nodeId] })
+    },
+    onError: (e) =>
+      toast.error("Failed to set server state", {
+        description: (e as Error).message,
+      }),
+  })
+
   const columns: ColumnDef<TableFeatures, RuntimeServerRow>[] = [
     { accessorKey: "backend", header: "Backend" },
     {
@@ -551,7 +575,30 @@ function StatsTab({
     {
       id: "admin",
       header: "Admin",
-      cell: ({ row }) => row.original.admin_state ?? "—",
+      cell: ({ row }) => {
+        const s = row.original
+        if (!s.backend || !s.name || s.name === "?")
+          return s.admin_state ?? "—"
+        const current = s.admin_state ?? "ready"
+        const states = ["ready", "drain", "maint"] as const
+        return (
+          <div className="flex items-center gap-1">
+            {states.map((st) => (
+              <Button
+                key={st}
+                size="xs"
+                variant={current === st ? "default" : "outline"}
+                disabled={stateMut.isPending}
+                onClick={() =>
+                  stateMut.mutate({ backend: s.backend, server: s.name!, admin_state: st })
+                }
+              >
+                {st}
+              </Button>
+            ))}
+          </div>
+        )
+      },
     },
   ]
   const table = useTable({ data: rows, columns, features: dataGridFeatures })

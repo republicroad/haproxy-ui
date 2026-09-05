@@ -9,6 +9,23 @@ const backends = new Map()
 const acls = new Map() // "frontend|name" / "backend|name" -> acl[]
 const runtimeMaps = new Map() // map name -> [{id,key,value}]
 
+function runtimeServer(beName, s) {
+  const admin = s.admin_state ?? "ready"
+  const oper = admin === "ready" ? "ready" : "down"
+  return {
+    name: s.name,
+    address: s.address,
+    port: s.port,
+    weight: s.weight ?? 100,
+    operational_state: oper,
+    admin_state: admin,
+    check_status: admin === "ready" ? "L4OK" : "MAINT",
+    fqdn: "-",
+    backend_name: beName,
+    id: "1",
+  }
+}
+
 function send(res, status, body) {
   const payload = typeof body === "string" ? body : JSON.stringify(body)
   res.writeHead(status, {
@@ -132,24 +149,37 @@ const server = createServer((req, res) => {
 
     // runtime per-backend server states (mirrors real dataplaneapi fields)
     const rtSrvMatch = p.match(
-      /^services\/haproxy\/runtime\/backends\/(.+)\/servers$/,
+      /^services\/haproxy\/runtime\/backends\/(.+)\/servers\/?(.+)?$/,
     )
     if (rtSrvMatch && method === "GET") {
       const beName = decodeURIComponent(rtSrvMatch[1])
       const be = backends.get(beName)
       if (!be) return send(res, 404, { code: 404, message: "backend not found" })
-      const runtime = (be.servers || []).map((s) => ({
-        name: s.name,
-        address: s.address,
-        port: s.port,
-        weight: s.weight ?? 100,
-        operational_state: "ready",
-        admin_state: "ready",
-        fqdn: "-",
-        backend_name: beName,
-        id: "1",
-      }))
+      if (rtSrvMatch[2]) {
+        const sName = decodeURIComponent(rtSrvMatch[2])
+        const s = (be.servers || []).find((x) => x.name === sName)
+        if (!s) return send(res, 404, { code: 404, message: "server not found" })
+        return send(res, 200, runtimeServer(beName, s))
+      }
+      const runtime = (be.servers || []).map((s) => runtimeServer(beName, s))
       return send(res, 200, runtime)
+    }
+    if (rtSrvMatch && method === "PUT" && rtSrvMatch[2]) {
+      const beName = decodeURIComponent(rtSrvMatch[1])
+      const be = backends.get(beName)
+      if (!be) return send(res, 404, { code: 404, message: "backend not found" })
+      const sName = decodeURIComponent(rtSrvMatch[2])
+      const s = (be.servers || []).find((x) => x.name === sName)
+      if (!s) return send(res, 404, { code: 404, message: "server not found" })
+      if (
+        json.admin_state &&
+        !["ready", "maint", "drain"].includes(json.admin_state)
+      ) {
+        return send(res, 400, { code: 400, message: "invalid admin_state" })
+      }
+      s.admin_state = json.admin_state ?? s.admin_state ?? "ready"
+      if (json.weight !== undefined) s.weight = json.weight
+      return send(res, 200, runtimeServer(beName, s))
     }
 
     // config ACLs per parent section (frontend/backend)

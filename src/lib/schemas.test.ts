@@ -173,13 +173,24 @@ describe("changeMetaSchema", () => {
 
   it("rejects unknown kind/resource", () => {
     expect(
-      changeMetaSchema.safeParse({ kind: "update", resource: "backend", target: "b" })
+      changeMetaSchema.safeParse({ kind: "patch", resource: "backend", target: "b" })
         .success,
     ).toBe(false)
     expect(
       changeMetaSchema.safeParse({ kind: "create", resource: "table", target: "x" })
         .success,
     ).toBe(false)
+  })
+
+  it("accepts the update kind introduced for section edits", () => {
+    expect(
+      changeMetaSchema.safeParse({
+        kind: "update",
+        resource: "backend",
+        target: "be1",
+        payload: { mode: "tcp" },
+      }).success,
+    ).toBe(true)
   })
 
   it("accepts acl/map resources introduced for the ACL/Maps tabs", () => {

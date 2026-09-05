@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select"
-import { withTransaction, dpPost, dpDelete, dpGet } from "#/lib/dataplane/client"
+import { withTransaction, dpPost, dpPut, dpDelete, dpGet } from "#/lib/dataplane/client"
 import {
   frontendInputSchema,
   backendInputSchema,
@@ -34,7 +34,7 @@ import {
   HAPROXY_MODES,
   BALANCE_ALGORITHMS,
 } from "#/lib/schemas"
-import type { Backend, Server } from "#/lib/types"
+import type { Backend, Frontend, Server } from "#/lib/types"
 
 const inputCls =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -70,12 +70,15 @@ function ModeSelect({
 export function FrontendDialog({
   open,
   nodeId,
+  edit,
   onClose,
   onCreated,
   onError,
 }: {
   open: boolean
   nodeId: string
+  /** When set, the dialog edits this frontend instead of creating one. */
+  edit?: Frontend | null
   onClose: () => void
   onCreated: () => void
   onError: (m: string | null) => void
@@ -92,16 +95,17 @@ export function FrontendDialog({
   useEffect(() => setMounted(true), [])
   useEffect(() => {
     if (open) {
+      const firstBind = Array.isArray(edit?.bind) ? edit.bind[0] : undefined
       setForm({
-        name: "",
-        mode: "http",
-        default_backend: "",
-        address: "*",
-        port: 80,
+        name: edit?.name ?? "",
+        mode: edit?.mode ?? "http",
+        default_backend: edit?.default_backend ?? "",
+        address: firstBind?.address ?? "*",
+        port: firstBind?.port ?? 80,
       })
       setErrors({})
     }
-  }, [open])
+  }, [open, edit])
   const beQ = useQuery({
     queryKey: ["fe-backends", nodeId],
     queryFn: () => dpGet<Backend[]>(nodeId, "services/haproxy/configuration/backends"),
@@ -110,6 +114,34 @@ export function FrontendDialog({
   const backendNames = (beQ.data ?? []).map((b) => b.name)
   const mut = useMutation({
     mutationFn: () => {
+      if (edit) {
+        // Replace semantics (full_section=false): only section fields are
+        // edited; binds stay untouched on the node.
+        return withTransaction(
+          nodeId,
+          async (tx) => {
+            await dpPut(
+              nodeId,
+              `services/haproxy/configuration/frontends/${encodeURIComponent(edit.name)}`,
+              {
+                name: edit.name,
+                mode: form.mode,
+                default_backend: form.default_backend || undefined,
+              },
+              tx,
+            )
+          },
+          {
+            kind: "update",
+            resource: "frontend",
+            target: edit.name,
+            payload: {
+              mode: form.mode,
+              default_backend: form.default_backend || undefined,
+            },
+          },
+        )
+      }
       const parsed = frontendInputSchema.safeParse({
         name: form.name,
         mode: form.mode,
@@ -149,13 +181,18 @@ export function FrontendDialog({
     },
   })
   return (
-    <Modal open={open} onClose={onClose} title="New frontend">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={edit ? `Edit frontend ${edit.name}` : "New frontend"}
+    >
       <div className="flex flex-col gap-3">
         <div>
           <input
             className={inputCls}
             placeholder="name"
             value={form.name}
+            disabled={Boolean(edit)}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             aria-invalid={Boolean(errors.name)}
           />
@@ -183,33 +220,41 @@ export function FrontendDialog({
             </AutocompleteContent>
           </Autocomplete>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <input
-              className={inputCls}
-              placeholder="bind address"
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              aria-invalid={Boolean(errors["bind.0.address"])}
-            />
-            <FieldError message={errors["bind.0.address"] ?? errors.bind} />
+        {!edit && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <input
+                className={inputCls}
+                placeholder="bind address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                aria-invalid={Boolean(errors["bind.0.address"])}
+              />
+              <FieldError message={errors["bind.0.address"] ?? errors.bind} />
+            </div>
+            <div>
+              <NumberField
+                value={form.port}
+                onValueChange={(v) => setForm({ ...form, port: v ?? 0 })}
+                min={1}
+                max={65535}
+              >
+                <NumberFieldGroup>
+                  <NumberFieldDecrement />
+                  <NumberFieldInput />
+                  <NumberFieldIncrement />
+                </NumberFieldGroup>
+              </NumberField>
+              <FieldError message={errors["bind.0.port"]} />
+            </div>
           </div>
-          <div>
-            <NumberField
-              value={form.port}
-              onValueChange={(v) => setForm({ ...form, port: v ?? 0 })}
-              min={1}
-              max={65535}
-            >
-              <NumberFieldGroup>
-                <NumberFieldDecrement />
-                <NumberFieldInput />
-                <NumberFieldIncrement />
-              </NumberFieldGroup>
-            </NumberField>
-            <FieldError message={errors["bind.0.port"]} />
-          </div>
-        </div>
+        )}
+        {edit && (
+          <p className="text-xs text-muted-foreground">
+            Edit mode changes mode/default_backend only. Binds on the node are
+            left untouched.
+          </p>
+        )}
         {mut.isError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {(mut.error as Error).message}
@@ -221,9 +266,9 @@ export function FrontendDialog({
           </Button>
           <Button
             onClick={() => mut.mutate()}
-            disabled={mut.isPending || !form.name}
+            disabled={mut.isPending || (!edit && !form.name)}
           >
-            {mut.isPending ? "Creating…" : "Create"}
+            {mut.isPending ? "Saving…" : edit ? "Save changes" : "Create"}
           </Button>
         </div>
       </div>
@@ -234,12 +279,15 @@ export function FrontendDialog({
 export function BackendDialog({
   open,
   nodeId,
+  edit,
   onClose,
   onCreated,
   onError,
 }: {
   open: boolean
   nodeId: string
+  /** When set, the dialog edits this backend instead of creating one. */
+  edit?: Backend | null
   onClose: () => void
   onCreated: () => void
   onError: (m: string | null) => void
@@ -252,12 +300,40 @@ export function BackendDialog({
   const [errors, setErrors] = useState<Record<string, string>>({})
   useEffect(() => {
     if (open) {
-      setForm({ name: "", mode: "http", algorithm: "roundrobin" })
+      setForm({
+        name: edit?.name ?? "",
+        mode: edit?.mode ?? "http",
+        algorithm: edit?.balance?.algorithm ?? "roundrobin",
+      })
       setErrors({})
     }
-  }, [open])
+  }, [open, edit])
   const mut = useMutation({
     mutationFn: () => {
+      if (edit) {
+        // Replace semantics (full_section=false): servers untouched.
+        return withTransaction(
+          nodeId,
+          async (tx) => {
+            await dpPut(
+              nodeId,
+              `services/haproxy/configuration/backends/${encodeURIComponent(edit.name)}`,
+              {
+                name: edit.name,
+                mode: form.mode,
+                balance: { algorithm: form.algorithm },
+              },
+              tx,
+            )
+          },
+          {
+            kind: "update",
+            resource: "backend",
+            target: edit.name,
+            payload: { mode: form.mode, balance: { algorithm: form.algorithm } },
+          },
+        )
+      }
       const parsed = backendInputSchema.safeParse(form)
       if (!parsed.success) {
         setErrors(fieldErrors(parsed.error))
@@ -292,13 +368,18 @@ export function BackendDialog({
     },
   })
   return (
-    <Modal open={open} onClose={onClose} title="New backend">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={edit ? `Edit backend ${edit.name}` : "New backend"}
+    >
       <div className="flex flex-col gap-3">
         <div>
           <input
             className={inputCls}
             placeholder="name"
             value={form.name}
+            disabled={Boolean(edit)}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             aria-invalid={Boolean(errors.name)}
           />
@@ -325,6 +406,12 @@ export function BackendDialog({
             </SelectContent>
           </Select>
         </div>
+        {edit && (
+          <p className="text-xs text-muted-foreground">
+            Edit mode changes mode/balance only. Servers on the node are left
+            untouched.
+          </p>
+        )}
         {mut.isError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {(mut.error as Error).message}
@@ -336,9 +423,9 @@ export function BackendDialog({
           </Button>
           <Button
             onClick={() => mut.mutate()}
-            disabled={mut.isPending || !form.name}
+            disabled={mut.isPending || (!edit && !form.name)}
           >
-            {mut.isPending ? "Creating…" : "Create"}
+            {mut.isPending ? "Saving…" : edit ? "Save changes" : "Create"}
           </Button>
         </div>
       </div>

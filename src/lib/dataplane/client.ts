@@ -79,7 +79,7 @@ export async function dpDelete(nodeId: string, path: string, txId?: string) {
 }
 
 export type ChangeMeta = {
-  kind: "create" | "delete"
+  kind: "create" | "delete" | "update"
   resource: "frontend" | "backend" | "server" | "acl" | "map"
   target: string
   parent?: string

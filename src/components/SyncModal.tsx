@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "#/components/ui/select"
 import { withTransaction, dpGet, dpPost, dpDelete } from "#/lib/dataplane/client"
+import { normalizeFrontends, normalizeBackends, serversOf } from "#/lib/normalize"
 import type { NodeRow, Frontend, Backend } from "#/lib/types"
 
 type SyncResult = {
@@ -62,8 +63,8 @@ export function SyncModal({
     queryFn: () => dpGet<Backend[]>(nodeId, "services/haproxy/configuration/backends"),
   })
 
-  const frontends = (feQ.data ?? []).filter((f) => !f.name.startsWith("_"))
-  const backends = (beQ.data ?? []).filter((b) => !b.name.startsWith("_"))
+  const frontends = normalizeFrontends(feQ.data).filter((f) => !f.name.startsWith("_"))
+  const backends = normalizeBackends(beQ.data).filter((b) => !b.name.startsWith("_"))
   const otherNodes = (nodesQ.data ?? []).filter((n) => n.id !== nodeId)
 
   const syncMut = useMutation({
@@ -108,7 +109,7 @@ export function SyncModal({
                       )
                     : []
                   const targetSrvNames = new Set(targetSrv.map((s) => s.name))
-                  for (const s of b.servers ?? []) {
+                  for (const s of serversOf(b)) {
                     if (targetSrvNames.has(s.name)) {
                       r.skipped.push(`server/${b.name}/${s.name}`)
                       continue
@@ -148,7 +149,7 @@ export function SyncModal({
                   payload: { name: b.name, mode: b.mode, balance: b.balance },
                 },
                 ...(includeServers
-                  ? (b.servers ?? []).map((s) => ({
+                  ? serversOf(b).map((s) => ({
                       kind: "create" as const,
                       resource: "server" as const,
                       target: s.name,
@@ -255,7 +256,7 @@ export function SyncModal({
                     />
                     {b.name}
                     <span className="text-muted-foreground">
-                      ({b.servers?.length ?? 0} servers)
+                      ({serversOf(b).length} servers)
                     </span>
                   </label>
                 ))}

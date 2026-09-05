@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { getNode, insertChange } from "#/lib/db"
 import { proxyToNode } from "#/lib/dataplane/proxy"
+import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 
 async function dpJson<T>(
   nodeId: string,
@@ -67,19 +68,21 @@ export const Route = createFileRoute("/api/nodes/$id/config")({
             { status: 502 },
           )
         }
+        const [nFes, nBes] = [
+          normalizeFrontends(fes as never),
+          normalizeBackends(bes as never),
+        ]
         const bundle = {
           exportedAt: new Date().toISOString(),
           sourceNode: { name: node.name, apiUrl: node.apiUrl },
-          frontends: fes.filter((f) => !f.name.startsWith("_")),
-          backends: bes
+          frontends: nFes.filter((f) => !f.name.startsWith("_")),
+          backends: nBes
             .filter((b) => !b.name.startsWith("_"))
             .map((b) => ({
               ...b,
-              servers: Array.isArray(b.servers)
-                ? b.servers.filter(
-                    (s: AnyConfig) => !String(s.name).startsWith("_"),
-                  )
-                : [],
+              servers: (Array.isArray(b.servers) ? b.servers : []).filter(
+                (s) => !String(s.name).startsWith("_"),
+              ),
             })),
         }
         return Response.json(bundle, {

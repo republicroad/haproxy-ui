@@ -45,6 +45,7 @@ import { SyncModal } from "#/components/SyncModal"
 import { GridSearchInput } from "#/components/GridSearchInput"
 import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
 import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
+import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 import { diffLines } from "#/lib/diff"
 
 const TABS = ["overview", "frontends", "backends", "acls", "maps", "stats", "history", "raw"] as const
@@ -74,12 +75,18 @@ function NodeDetail() {
   })
   const feQ = useQuery({
     queryKey: ["frontends", id],
-    queryFn: () => dpGet<Frontend[]>(id, "services/haproxy/configuration/frontends"),
+    queryFn: async () =>
+      normalizeFrontends(
+        await dpGet<Frontend[]>(id, "services/haproxy/configuration/frontends"),
+      ),
     enabled: mounted && tab === "frontends",
   })
   const beQ = useQuery({
     queryKey: ["backends", id],
-    queryFn: () => dpGet<Backend[]>(id, "services/haproxy/configuration/backends"),
+    queryFn: async () =>
+      normalizeBackends(
+        await dpGet<Backend[]>(id, "services/haproxy/configuration/backends"),
+      ),
     enabled: mounted && (tab === "backends" || tab === "stats"),
   })
   const rawQ = useQuery({
@@ -234,6 +241,7 @@ function FrontendsTab({
   onChanged: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [editingFe, setEditingFe] = useState<Frontend | null>(null)
   const [feSearch, setFeSearch] = useState("")
   const columns: ColumnDef<TableFeatures, Frontend>[] = [
     { accessorKey: "name", header: "Name" },
@@ -242,7 +250,7 @@ function FrontendsTab({
       id: "bind",
       header: "Bind",
       cell: ({ row }) =>
-        (row.original.bind ?? [])
+        (Array.isArray(row.original.bind) ? row.original.bind : [])
           .map((b) => `${b.address}:${b.port}`)
           .join(", ") || "—",
     },
@@ -251,7 +259,17 @@ function FrontendsTab({
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditingFe(row.original)
+              setOpen(true)
+            }}
+          >
+            Edit
+          </Button>
           <Button
             size="sm"
             variant="destructive"
@@ -319,10 +337,15 @@ function FrontendsTab({
       <FrontendDialog
         open={open}
         nodeId={nodeId}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false)
+          setEditingFe(null)
+        }}
+        edit={editingFe}
         onCreated={() => {
           onChanged()
           setOpen(false)
+          setEditingFe(null)
         }}
         onError={onError}
       />
@@ -345,6 +368,7 @@ function BackendsTab({
 }) {
   const [open, setOpen] = useState(false)
   const [manage, setManage] = useState<Backend | null>(null)
+  const [editingBe, setEditingBe] = useState<Backend | null>(null)
   const [beSearch, setBeSearch] = useState("")
   const columns: ColumnDef<TableFeatures, Backend>[] = [
     { accessorKey: "name", header: "Name" },
@@ -366,6 +390,16 @@ function BackendsTab({
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="outline" onClick={() => setManage(row.original)}>
             Servers
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditingBe(row.original)
+              setOpen(true)
+            }}
+          >
+            Edit
           </Button>
           <Button
             size="sm"
@@ -439,10 +473,15 @@ function BackendsTab({
       <BackendDialog
         open={open}
         nodeId={nodeId}
-        onClose={() => setOpen(false)}
+        edit={editingBe}
+        onClose={() => {
+          setOpen(false)
+          setEditingBe(null)
+        }}
         onCreated={() => {
           onChanged()
           setOpen(false)
+          setEditingBe(null)
         }}
         onError={onError}
       />

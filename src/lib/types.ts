@@ -14,7 +14,11 @@ export type Frontend = {
   name: string
   mode?: string
   default_backend?: string
-  bind?: Array<{ address: string; port: number; name?: string }>
+  /**
+   * v2 dataplaneapi returns an array; v3 models binds as a map keyed by name.
+   * Use normalizeFrontend() to always get an array.
+   */
+  bind?: Array<{ address: string; port: number; name?: string }> | Record<string, { address: string; port: number; name?: string }>
   description?: string
 }
 
@@ -32,6 +36,10 @@ export type Backend = {
   name: string
   mode?: string
   balance?: { algorithm?: string }
-  servers?: Server[]
+  /**
+   * v2 dataplaneapi returns an array; v3 models servers as a map keyed by name.
+   * Use normalizeBackend() to always get an array.
+   */
+  servers?: Server[] | Record<string, Server>
   description?: string
 }

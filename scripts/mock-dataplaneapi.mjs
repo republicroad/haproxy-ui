@@ -112,6 +112,14 @@ const server = createServer((req, res) => {
       if (i >= 0) frontends.splice(i, 1)
       return send(res, 202, {})
     }
+    if (feMatch && method === "PUT") {
+      const name = decodeURIComponent(feMatch[1])
+      const i = frontends.findIndex((f) => f.name === name)
+      if (i < 0) return send(res, 404, { code: 404, message: "frontend not found" })
+      // full_section=false semantics: only section fields replaced
+      frontends[i] = { ...frontends[i], ...json, name }
+      return send(res, 200, frontends[i])
+    }
 
     // backends
     if (p === "services/haproxy/configuration/backends" && method === "GET") {
@@ -145,6 +153,19 @@ const server = createServer((req, res) => {
     if (beMatch && method === "DELETE") {
       backends.delete(decodeURIComponent(beMatch[1]))
       return send(res, 202, {})
+    }
+    if (beMatch && method === "PUT") {
+      const name = decodeURIComponent(beMatch[1])
+      const be = backends.get(name)
+      if (!be) return send(res, 404, { code: 404, message: "backend not found" })
+      // full_section=false semantics: servers untouched
+      backends.set(name, {
+        ...be,
+        mode: json.mode ?? be.mode,
+        balance: json.balance ?? be.balance,
+        description: json.description ?? be.description,
+      })
+      return send(res, 200, backends.get(name))
     }
 
     // runtime per-backend server states (mirrors real dataplaneapi fields)

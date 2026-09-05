@@ -20,3 +20,5 @@ haproxy/*/run/
 
 test-results/
 playwright-report/
+
+playwright/.auth/

@@ -47,6 +47,16 @@ db.exec(`
     raw_after TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_changes_node ON config_changes(node_id, ts);
+  CREATE TABLE IF NOT EXISTS node_health_checks (
+    id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    ok INTEGER NOT NULL,
+    version TEXT,
+    latency_ms INTEGER,
+    error TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_health_node ON node_health_checks(node_id, ts);
 `)
 
 /** Encrypt any legacy plaintext api_pass values when HAPROXY_UI_KEY is set. */
@@ -270,4 +280,91 @@ export function trimChanges(nodeId: string, keepCount: number): number {
     .prepare(`DELETE FROM config_changes WHERE id IN (${placeholders})`)
     .run(...ids.map((i) => i.id))
   return Number(r.changes)
+}
+
+export type HealthCheckRow = {
+  id: string
+  nodeId: string
+  ts: number
+  ok: boolean
+  version: string | null
+  latencyMs: number | null
+  error: string | null
+}
+
+export function insertHealthCheck(c: Omit<HealthCheckRow, "id">): void {
+  db.prepare(
+    "INSERT INTO node_health_checks (id, node_id, ts, ok, version, latency_ms, error) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run(crypto.randomUUID(), c.nodeId, c.ts, c.ok ? 1 : 0, c.version, c.latencyMs, c.error)
+}
+
+export function listHealthChecks(nodeId: string, limit = 60): Omit<HealthCheckRow, "id">[] {
+  return (
+    db
+      .prepare(
+        "SELECT node_id, ts, ok, version, latency_ms, error FROM node_health_checks WHERE node_id = ? ORDER BY ts DESC LIMIT ?",
+      )
+      .all(nodeId, limit) as {
+      node_id: string
+      ts: number
+      ok: number
+      version: string | null
+      latency_ms: number | null
+      error: string | null
+    }[]
+  ).map((r) => ({
+    nodeId: r.node_id,
+    ts: r.ts,
+    ok: r.ok === 1,
+    version: r.version,
+    latencyMs: r.latency_ms,
+    error: r.error,
+  }))
+}
+
+/** Latest health check per node (for dashboards). */
+export function listLatestHealthChecks(): (Omit<HealthCheckRow, "id"> & { nodeId: string })[] {
+  return (
+    db
+      .prepare(
+        `SELECT h.node_id, h.ts, h.ok, h.version, h.latency_ms, h.error
+         FROM node_health_checks h
+         JOIN (SELECT node_id, MAX(ts) AS max_ts FROM node_health_checks GROUP BY node_id) m
+           ON h.node_id = m.node_id AND h.ts = m.max_ts`,
+      )
+      .all() as {
+      node_id: string
+      ts: number
+      ok: number
+      version: string | null
+      latency_ms: number | null
+      error: string | null
+    }[]
+  ).map((r) => ({
+    nodeId: r.node_id,
+    ts: r.ts,
+    ok: r.ok === 1,
+    version: r.version,
+    latencyMs: r.latency_ms,
+    error: r.error,
+  }))
+}
+
+/** Timestamp of the most recent health check for a node (0 if none). */
+export function lastHealthCheckTs(nodeId: string): number {
+  const row = db
+    .prepare("SELECT MAX(ts) AS m FROM node_health_checks WHERE node_id = ?")
+    .get(nodeId) as { m: number | null }
+  return row.m ?? 0
+}
+
+export function trimHealthChecks(keepCount = 720): void {
+  db.exec(`
+    DELETE FROM node_health_checks WHERE id IN (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY node_id ORDER BY ts DESC) AS rn
+        FROM node_health_checks
+      ) WHERE rn > ${Math.max(1, keepCount)}
+    )
+  `)
 }

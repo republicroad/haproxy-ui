@@ -17,6 +17,7 @@ import { Route as NodesIdRouteImport } from './routes/nodes.$id'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthStatusRouteImport } from './routes/api/auth/status'
+import { Route as ApiHealthSummaryRouteImport } from './routes/api/health/summary'
 import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
@@ -65,6 +66,11 @@ const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
 const ApiAuthStatusRoute = ApiAuthStatusRouteImport.update({
   id: '/api/auth/status',
   path: '/api/auth/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthSummaryRoute = ApiHealthSummaryRouteImport.update({
+  id: '/api/health/summary',
+  path: '/api/health/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNodesIdRoute = ApiNodesIdRouteImport.update({
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
+  '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
+  '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
+  '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
+    | '/api/health/summary'
     | '/api/nodes/$id'
     | '/api/nodes/export'
     | '/api/nodes/import'
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
+    | '/api/health/summary'
     | '/api/nodes/$id'
     | '/api/nodes/export'
     | '/api/nodes/import'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
+    | '/api/health/summary'
     | '/api/nodes/$id'
     | '/api/nodes/export'
     | '/api/nodes/import'
@@ -241,6 +253,7 @@ export interface RootRouteChildren {
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthStatusRoute: typeof ApiAuthStatusRoute
+  ApiHealthSummaryRoute: typeof ApiHealthSummaryRoute
   ApiDpNodeIdSplatRoute: typeof ApiDpNodeIdSplatRoute
 }
 
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/status'
       fullPath: '/api/auth/status'
       preLoaderRoute: typeof ApiAuthStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health/summary': {
+      id: '/api/health/summary'
+      path: '/api/health/summary'
+      fullPath: '/api/health/summary'
+      preLoaderRoute: typeof ApiHealthSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nodes/$id': {
@@ -443,6 +463,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthLoginRoute: ApiAuthLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthStatusRoute: ApiAuthStatusRoute,
+  ApiHealthSummaryRoute: ApiHealthSummaryRoute,
   ApiDpNodeIdSplatRoute: ApiDpNodeIdSplatRoute,
 }
 export const routeTree = rootRouteImport

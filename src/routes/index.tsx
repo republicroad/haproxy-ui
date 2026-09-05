@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { NodesTable } from "#/components/NodesTable"
+import { FleetHealth } from "#/components/FleetHealth"
 import type { NodeRow } from "#/lib/types"
 
 async function fetchNodes(): Promise<NodeRow[]> {
@@ -56,6 +57,7 @@ function Overview() {
         <Stat label="Down" value={down} tone="destructive" />
         <Stat label="Unknown" value={nodes.length - up - down} />
       </div>
+      <FleetHealth />
       <div>
         <h2 className="mb-2 text-lg font-semibold">Nodes</h2>
         {isLoading ? (

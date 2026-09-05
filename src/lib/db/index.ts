@@ -74,6 +74,22 @@ db.exec(`
     role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'viewer')),
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS metric_samples (
+    id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    obj_type TEXT NOT NULL,
+    obj_name TEXT NOT NULL,
+    scur INTEGER,
+    stot INTEGER,
+    req_rate INTEGER,
+    bin INTEGER,
+    bout INTEGER,
+    hrsp_2xx INTEGER,
+    hrsp_5xx INTEGER,
+    status TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_metrics_node_ts ON metric_samples(node_id, obj_name, ts);
 `)
 
 // Lightweight migration for databases created before the actor column
@@ -514,4 +530,100 @@ export function countAdmins(): number {
     .prepare("SELECT COUNT(*) AS c FROM users WHERE role = 'admin'")
     .get() as { c: number }
   return row.c
+}
+
+export type MetricSample = {
+  nodeId: string
+  ts: number
+  objType: string
+  objName: string
+  scur: number | null
+  stot: number | null
+  reqRate: number | null
+  bin: number | null
+  bout: number | null
+  hrsp2xx: number | null
+  hrsp5xx: number | null
+  status: string | null
+}
+
+export function insertMetricSamples(
+  nodeId: string,
+  samples: Omit<MetricSample, "nodeId">[],
+): void {
+  const stmt = db.prepare(
+    "INSERT INTO metric_samples (id, node_id, ts, obj_type, obj_name, scur, stot, req_rate, bin, bout, hrsp_2xx, hrsp_5xx, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  )
+  for (const s of samples) {
+    stmt.run(
+      crypto.randomUUID(),
+      nodeId,
+      s.ts,
+      s.objType,
+      s.objName,
+      s.scur,
+      s.stot,
+      s.reqRate,
+      s.bin,
+      s.bout,
+      s.hrsp2xx,
+      s.hrsp5xx,
+      s.status,
+    )
+  }
+}
+
+/** Metric samples for a node within the last `hours` hours, oldest first. */
+export function listMetricSamples(
+  nodeId: string,
+  hours = 24,
+  objType?: string,
+): (Omit<MetricSample, "id" | "nodeId"> & { ts: number })[] {
+  const since = Date.now() - hours * 3_600_000
+  const rows = (
+    objType
+      ? db
+          .prepare(
+            "SELECT node_id, ts, obj_type, obj_name, scur, stot, req_rate, bin, bout, hrsp_2xx, hrsp_5xx, status FROM metric_samples WHERE node_id = ? AND ts >= ? AND obj_type = ? ORDER BY ts ASC",
+          )
+          .all(nodeId, since, objType)
+      : db
+          .prepare(
+            "SELECT node_id, ts, obj_type, obj_name, scur, stot, req_rate, bin, bout, hrsp_2xx, hrsp_5xx, status FROM metric_samples WHERE node_id = ? AND ts >= ? ORDER BY ts ASC",
+          )
+          .all(nodeId, since)
+  ) as {
+    node_id: string
+    ts: number
+    obj_type: string
+    obj_name: string
+    scur: number | null
+    stot: number | null
+    req_rate: number | null
+    bin: number | null
+    bout: number | null
+    hrsp_2xx: number | null
+    hrsp_5xx: number | null
+    status: string | null
+  }[]
+  return rows.map((r) => ({
+    ts: r.ts,
+    objType: r.obj_type,
+    objName: r.obj_name,
+    scur: r.scur,
+    stot: r.stot,
+    reqRate: r.req_rate,
+    bin: r.bin,
+    bout: r.bout,
+    hrsp2xx: r.hrsp_2xx,
+    hrsp5xx: r.hrsp_5xx,
+    status: r.status,
+  }))
+}
+
+/** Purge metric samples older than `hours`. Returns deleted row count. */
+export function purgeMetricSamples(keepHours: number): number {
+  const cutoff = Date.now() - keepHours * 3_600_000
+  const r = db.prepare("DELETE FROM metric_samples WHERE ts < ?").run(cutoff)
+  return Number(r.changes)
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "#/components/reui/badge"
 import { Button } from "#/components/ui/button"
@@ -44,6 +44,109 @@ function StatusBadge({ status }: { status?: string }) {
     <Badge variant={up ? "success" : down ? "destructive" : "secondary"}>
       {status}
     </Badge>
+  )
+}
+
+type TrafficHistorySample = {
+  ts: number
+  objType: string
+  objName: string
+  stot: number | null
+  reqRate: number | null
+  bin: number | null
+  bout: number | null
+}
+
+/** Simple SVG line chart for a single series over time. */
+function TrendChart({
+  series,
+  label,
+  color,
+}: {
+  series: { ts: number; value: number }[]
+  label: string
+  color: string
+}) {
+  if (series.length < 2) {
+    return (
+      <div className="flex h-24 items-center justify-center rounded-lg border border-border text-xs text-muted-foreground">
+        {label}: not enough samples yet (collected every 5 minutes)
+      </div>
+    )
+  }
+  const w = 560
+  const h = 96
+  const pad = 4
+  const values = series.map((p) => p.value)
+  const max = Math.max(...values, 1)
+  const min = Math.min(...values, 0)
+  const range = max - min || 1
+  const t0 = series[0].ts
+  const t1 = series[series.length - 1].ts
+  const tRange = t1 - t0 || 1
+  const pts = series.map((p) => {
+    const x = pad + ((p.ts - t0) / tRange) * (w - 2 * pad)
+    const y = h - pad - ((p.value - min) / range) * (h - 2 * pad)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+  const last = values[values.length - 1]
+  return (
+    <div className="rounded-lg border border-border p-2">
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground">
+          now {last.toLocaleString()} · {series.length} samples / 24h
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label={label}>
+        <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="1.5" />
+      </svg>
+    </div>
+  )
+}
+
+/** 24h trend charts built from the metric_samples table. */
+function TrafficTrends({ nodeId, focusName }: { nodeId: string; focusName: string }) {
+  const q = useQuery({
+    queryKey: ["traffic-history", nodeId, focusName],
+    queryFn: async (): Promise<TrafficHistorySample[]> => {
+      const qs = focusName ? `&name=${encodeURIComponent(focusName)}` : ""
+      const res = await fetch(`/api/nodes/${nodeId}/metrics?hours=24&type=frontend${qs}`)
+      if (!res.ok) throw new Error("failed to load metric history")
+      const j = (await res.json()) as { samples: TrafficHistorySample[] }
+      return j.samples
+    },
+    enabled: Boolean(nodeId),
+    refetchInterval: 60_000,
+  })
+
+  const samples = q.data ?? []
+  // aggregate across frontends per timestamp when no focus object
+  const rateSeries = useMemo(() => {
+    const byTs = new Map<number, number>()
+    for (const s of samples) {
+      if (s.reqRate == null) continue
+      byTs.set(s.ts, (byTs.get(s.ts) ?? 0) + s.reqRate)
+    }
+    return [...byTs.entries()].sort((a, b) => a[0] - b[0]).map(([ts, value]) => ({ ts, value }))
+  }, [samples])
+
+  const binSeries = useMemo(() => {
+    const byTs = new Map<number, number>()
+    for (const s of samples) {
+      if (s.bin == null) continue
+      byTs.set(s.ts, (byTs.get(s.ts) ?? 0) + s.bin)
+    }
+    return [...byTs.entries()].sort((a, b) => a[0] - b[0]).map(([ts, value]) => ({ ts, value }))
+  }, [samples])
+
+  if (q.isError) return null
+
+  return (
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <TrendChart series={rateSeries} label="Requests/s (24h, all frontends)" color="#3b82f6" />
+      <TrendChart series={binSeries} label="Bytes in (24h, all frontends)" color="#10b981" />
+    </div>
   )
 }
 
@@ -149,6 +252,8 @@ export function TrafficTab({ nodeId }: { nodeId: string }) {
           </Button>
         </div>
       </div>
+
+      <TrafficTrends nodeId={nodeId} focusName={filter} />
 
       {q.isLoading && <p className="text-muted-foreground">Loading stats…</p>}
       {q.isError && (

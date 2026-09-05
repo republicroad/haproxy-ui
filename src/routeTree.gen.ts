@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NodesRouteImport } from './routes/nodes'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
+import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as NodesIndexRouteImport } from './routes/nodes.index'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
 import { Route as ApiAlertsSettingsRouteImport } from './routes/api/alerts/settings'
@@ -25,6 +27,7 @@ import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
 import { Route as ApiNodesDiffRouteImport } from './routes/api/nodes.diff'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
+import { Route as ApiUsersUsernameRouteImport } from './routes/api/users/$username'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
 import { Route as ApiNodesIdChangesRouteImport } from './routes/api/nodes/$id/changes'
 import { Route as ApiNodesIdConfigRouteImport } from './routes/api/nodes/$id/config'
@@ -47,9 +50,19 @@ const NodesRoute = NodesRouteImport.update({
   path: '/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNodesRoute = ApiNodesRouteImport.update({
   id: '/api/nodes',
   path: '/api/nodes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUsersRoute = ApiUsersRouteImport.update({
+  id: '/api/users',
+  path: '/api/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NodesIndexRoute = NodesIndexRouteImport.update({
@@ -112,6 +125,11 @@ const ApiNodesImportRoute = ApiNodesImportRouteImport.update({
   path: '/import',
   getParentRoute: () => ApiNodesRoute,
 } as any)
+const ApiUsersUsernameRoute = ApiUsersUsernameRouteImport.update({
+  id: '/$username',
+  path: '/$username',
+  getParentRoute: () => ApiUsersRoute,
+} as any)
 const ApiDpNodeIdSplatRoute = ApiDpNodeIdSplatRouteImport.update({
   id: '/api/dp/$nodeId/$',
   path: '/api/dp/$nodeId/$',
@@ -149,7 +167,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
+  '/users': typeof UsersRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
+  '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
   '/api/alerts/settings': typeof ApiAlertsSettingsRoute
@@ -162,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
@@ -172,7 +193,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/users': typeof UsersRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
+  '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes': typeof NodesIndexRoute
   '/api/alerts/settings': typeof ApiAlertsSettingsRoute
@@ -185,6 +208,7 @@ export interface FileRoutesByTo {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
@@ -197,7 +221,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
+  '/users': typeof UsersRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
+  '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
   '/api/alerts/settings': typeof ApiAlertsSettingsRoute
@@ -210,6 +236,7 @@ export interface FileRoutesById {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
@@ -223,7 +250,9 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/nodes'
+    | '/users'
     | '/api/nodes'
+    | '/api/users'
     | '/nodes/$id'
     | '/nodes/'
     | '/api/alerts/settings'
@@ -236,6 +265,7 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/users/$username'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
@@ -246,7 +276,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/users'
     | '/api/nodes'
+    | '/api/users'
     | '/nodes/$id'
     | '/nodes'
     | '/api/alerts/settings'
@@ -259,6 +291,7 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/users/$username'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
@@ -270,7 +303,9 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/nodes'
+    | '/users'
     | '/api/nodes'
+    | '/api/users'
     | '/nodes/$id'
     | '/nodes/'
     | '/api/alerts/settings'
@@ -283,6 +318,7 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/users/$username'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
@@ -295,7 +331,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   NodesRoute: typeof NodesRouteWithChildren
+  UsersRoute: typeof UsersRoute
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
+  ApiUsersRoute: typeof ApiUsersRouteWithChildren
   ApiAlertsSettingsRoute: typeof ApiAlertsSettingsRoute
   ApiAlertsTestRoute: typeof ApiAlertsTestRoute
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
@@ -328,11 +366,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NodesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/nodes': {
       id: '/api/nodes'
       path: '/api/nodes'
       fullPath: '/api/nodes'
       preLoaderRoute: typeof ApiNodesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/users': {
+      id: '/api/users'
+      path: '/api/users'
+      fullPath: '/api/users'
+      preLoaderRoute: typeof ApiUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nodes/': {
@@ -418,6 +470,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/nodes/import'
       preLoaderRoute: typeof ApiNodesImportRouteImport
       parentRoute: typeof ApiNodesRoute
+    }
+    '/api/users/$username': {
+      id: '/api/users/$username'
+      path: '/$username'
+      fullPath: '/api/users/$username'
+      preLoaderRoute: typeof ApiUsersUsernameRouteImport
+      parentRoute: typeof ApiUsersRoute
     }
     '/api/dp/$nodeId/$': {
       id: '/api/dp/$nodeId/$'
@@ -535,11 +594,25 @@ const ApiNodesRouteWithChildren = ApiNodesRoute._addFileChildren(
   ApiNodesRouteChildren,
 )
 
+interface ApiUsersRouteChildren {
+  ApiUsersUsernameRoute: typeof ApiUsersUsernameRoute
+}
+
+const ApiUsersRouteChildren: ApiUsersRouteChildren = {
+  ApiUsersUsernameRoute: ApiUsersUsernameRoute,
+}
+
+const ApiUsersRouteWithChildren = ApiUsersRoute._addFileChildren(
+  ApiUsersRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   NodesRoute: NodesRouteWithChildren,
+  UsersRoute: UsersRoute,
   ApiNodesRoute: ApiNodesRouteWithChildren,
+  ApiUsersRoute: ApiUsersRouteWithChildren,
   ApiAlertsSettingsRoute: ApiAlertsSettingsRoute,
   ApiAlertsTestRoute: ApiAlertsTestRoute,
   ApiAuthLoginRoute: ApiAuthLoginRoute,

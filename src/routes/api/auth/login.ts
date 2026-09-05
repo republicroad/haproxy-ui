@@ -31,13 +31,14 @@ export const Route = createFileRoute("/api/auth/login")({
         } catch {
           return Response.json({ error: "invalid JSON body" }, { status: 400 })
         }
-        if (!verifyCredentials(body.user ?? "", body.pass ?? "")) {
+        const verified = verifyCredentials(body.user ?? "", body.pass ?? "")
+        if (!verified.ok) {
           recordLoginFailure(ip)
           return Response.json({ error: "invalid credentials" }, { status: 401 })
         }
         return Response.json(
-          { ok: true },
-          { headers: { "set-cookie": sessionSetCookieHeader() } },
+          { ok: true, role: verified.role },
+          { headers: { "set-cookie": sessionSetCookieHeader(body.user ?? "") } },
         )
       },
     },

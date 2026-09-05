@@ -6,12 +6,8 @@ import {
   LayoutDashboard,
   Boxes,
   LogOut,
+  Users as UsersIcon,
 } from "lucide-react"
-
-const nav = [
-  { to: "/", label: "Overview", icon: LayoutDashboard },
-  { to: "/nodes", label: "Nodes", icon: Boxes },
-]
 
 function LogoutButton() {
   const navigate = useNavigate()
@@ -34,13 +30,28 @@ function LogoutButton() {
 export function Sidebar() {
   const location = useLocation()
   const [authEnabled, setAuthEnabled] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
   useEffect(() => {
-    // The login page is only reachable when auth is on; probing it is cheap.
     fetch("/api/auth/status")
-      .then((r) => (r.ok ? r.json() : { enabled: false }))
-      .then((j: { enabled?: boolean }) => setAuthEnabled(Boolean(j.enabled)))
-      .catch(() => setAuthEnabled(false))
+      .then((r) => (r.ok ? r.json() : { enabled: false, role: "admin" }))
+      .then((j: { enabled?: boolean; role?: string }) => {
+        setAuthEnabled(Boolean(j.enabled))
+        setRole(j.enabled ? (j.role ?? null) : "admin")
+      })
+      .catch(() => {
+        setAuthEnabled(false)
+        setRole(null)
+      })
   }, [])
+
+  const nav = [
+    { to: "/" as const, label: "Overview", icon: LayoutDashboard },
+    { to: "/nodes" as const, label: "Nodes", icon: Boxes },
+    ...(authEnabled && role === "admin"
+      ? [{ to: "/users" as const, label: "Users", icon: UsersIcon }]
+      : []),
+  ]
+
   return (
     <aside className="w-60 shrink-0 border-r border-border bg-card/40 p-4 hidden md:flex md:flex-col">
       <div className="flex items-center gap-2 px-2 py-3">

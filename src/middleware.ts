@@ -2,13 +2,17 @@ import { createMiddleware } from "@tanstack/react-start"
 import {
   authEnabled,
   readSessionCookie,
+  roleFromRequest,
   verifySessionToken,
 } from "#/lib/auth"
 
 /**
- * Global request guard. Active only when HAPROXY_UI_USER + HAPROXY_UI_PASS
- * are set. /login and /api/auth/* stay public; everything else requires a
- * valid session cookie (401 for /api/*, redirect for pages).
+ * Global request guard. Active only when authentication is configured
+ * (env single-user or DB users).
+ *
+ * Public: /login and /api/auth/*. Everything else requires a valid
+ * session cookie. RBAC: `viewer` sessions may only perform GET/HEAD
+ * requests (writes get 403); `admin` is unrestricted.
  */
 export const authMiddleware = createMiddleware().server(async ({ request, next }) => {
   if (!authEnabled()) return next()
@@ -22,7 +26,17 @@ export const authMiddleware = createMiddleware().server(async ({ request, next }
     path === "/api/auth/status"
   if (isPublic) return next()
 
-  if (verifySessionToken(readSessionCookie(request))) return next()
+  if (verifySessionToken(readSessionCookie(request))) {
+    const method = request.method.toUpperCase()
+    const write = method !== "GET" && method !== "HEAD" && method !== "OPTIONS"
+    if (write && roleFromRequest(request) !== "admin") {
+      return Response.json(
+        { error: "forbidden: viewer role is read-only" },
+        { status: 403 },
+      )
+    }
+    return next()
+  }
 
   if (path.startsWith("/api/")) {
     return Response.json({ error: "unauthorized" }, { status: 401 })

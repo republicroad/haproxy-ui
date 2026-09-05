@@ -68,6 +68,12 @@ db.exec(`
     last_ok INTEGER,
     last_alert_ts INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    pass_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'viewer')),
+    created_at INTEGER NOT NULL
+  );
 `)
 
 // Lightweight migration for databases created before the actor column
@@ -438,4 +444,74 @@ export function setAlertState(nodeId: string, lastOk: boolean, lastAlertTs?: num
      ON CONFLICT(node_id) DO UPDATE SET last_ok = excluded.last_ok,
      last_alert_ts = COALESCE(?, alert_state.last_alert_ts)`,
   ).run(nodeId, lastOk ? 1 : 0, lastAlertTs ?? 0, lastAlertTs ?? null)
+}
+
+export type UserRow = {
+  username: string
+  passHash: string
+  role: "admin" | "viewer"
+  createdAt: number
+}
+
+export function listUsers(): Omit<UserRow, "passHash">[] {
+  return (
+    db
+      .prepare("SELECT username, role, created_at FROM users ORDER BY created_at ASC")
+      .all() as { username: string; role: string; created_at: number }[]
+  ).map((r) => ({
+    username: r.username,
+    role: r.role as "admin" | "viewer",
+    createdAt: r.created_at,
+  }))
+}
+
+export function getUser(username: string): UserRow | undefined {
+  const row = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as
+    | { username: string; pass_hash: string; role: string; created_at: number }
+    | undefined
+  if (!row) return undefined
+  return {
+    username: row.username,
+    passHash: row.pass_hash,
+    role: row.role as "admin" | "viewer",
+    createdAt: row.created_at,
+  }
+}
+
+export function insertUser(u: Omit<UserRow, "createdAt">): void {
+  db.prepare(
+    "INSERT INTO users (username, pass_hash, role, created_at) VALUES (?, ?, ?, ?)",
+  ).run(u.username, u.passHash, u.role, Date.now())
+}
+
+export function updateUser(
+  username: string,
+  patch: { passHash?: string; role?: "admin" | "viewer" },
+): void {
+  const sets: string[] = []
+  const vals: unknown[] = []
+  if (patch.passHash !== undefined) {
+    sets.push("pass_hash = ?")
+    vals.push(patch.passHash)
+  }
+  if (patch.role !== undefined) {
+    sets.push("role = ?")
+    vals.push(patch.role)
+  }
+  if (sets.length === 0) return
+  vals.push(username)
+  db.prepare(`UPDATE users SET ${sets.join(", ")} WHERE username = ?`).run(
+    ...(vals as (string | number)[]),
+  )
+}
+
+export function deleteUser(username: string): void {
+  db.prepare("DELETE FROM users WHERE username = ?").run(username)
+}
+
+export function countAdmins(): number {
+  const row = db
+    .prepare("SELECT COUNT(*) AS c FROM users WHERE role = 'admin'")
+    .get() as { c: number }
+  return row.c
 }

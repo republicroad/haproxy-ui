@@ -1,5 +1,4 @@
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router"
-import { createIsomorphicFn } from "@tanstack/react-start"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
 import { Toaster } from "sonner"
@@ -12,36 +11,7 @@ import appCss from "../styles.css?url"
 
 const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'auto';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
 
-const assertBasicAuth = createIsomorphicFn()
-  .server(async () => {
-    const { getRequest } = await import("@tanstack/react-start/server")
-    const UI_USER = process.env.HAPROXY_UI_USER
-    const UI_PASS = process.env.HAPROXY_UI_PASS
-    if (!UI_USER || !UI_PASS) return
-    const request = getRequest()
-    const header = request.headers.get("authorization")
-    let ok = false
-    if (header?.startsWith("Basic ")) {
-      try {
-        const [user, pass] = atob(header.slice(6)).split(":")
-        ok = user === UI_USER && pass === UI_PASS
-      } catch {
-        ok = false
-      }
-    }
-    if (!ok) {
-      throw new Response("Unauthorized", {
-        status: 401,
-        headers: { "WWW-Authenticate": 'Basic realm="haproxy-ui"' },
-      })
-    }
-  })
-  .client(() => {})
-
 export const Route = createRootRoute({
-  beforeLoad: async () => {
-    await assertBasicAuth()
-  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

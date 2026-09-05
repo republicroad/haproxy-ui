@@ -10,9 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
+import { Route as ApiAuthStatusRouteImport } from './routes/api/auth/status'
 import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
@@ -26,6 +30,11 @@ import { Route as ApiNodesIdChangesChangeIdRevertRouteImport } from './routes/ap
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NodesRoute = NodesRouteImport.update({
@@ -42,6 +51,21 @@ const NodesIdRoute = NodesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => NodesRoute,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthStatusRoute = ApiAuthStatusRouteImport.update({
+  id: '/api/auth/status',
+  path: '/api/auth/status',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNodesIdRoute = ApiNodesIdRouteImport.update({
   id: '/$id',
@@ -93,9 +117,13 @@ const ApiNodesIdChangesChangeIdRevertRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/status': typeof ApiAuthStatusRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
@@ -108,9 +136,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/status': typeof ApiAuthStatusRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
@@ -124,9 +156,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/status': typeof ApiAuthStatusRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
@@ -141,9 +177,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
     | '/nodes'
     | '/api/nodes'
     | '/nodes/$id'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/status'
     | '/api/nodes/$id'
     | '/api/nodes/export'
     | '/api/nodes/import'
@@ -156,9 +196,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
     | '/nodes'
     | '/api/nodes'
     | '/nodes/$id'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/status'
     | '/api/nodes/$id'
     | '/api/nodes/export'
     | '/api/nodes/import'
@@ -171,9 +215,13 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/login'
     | '/nodes'
     | '/api/nodes'
     | '/nodes/$id'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/status'
     | '/api/nodes/$id'
     | '/api/nodes/export'
     | '/api/nodes/import'
@@ -187,8 +235,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   NodesRoute: typeof NodesRouteWithChildren
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiAuthStatusRoute: typeof ApiAuthStatusRoute
   ApiDpNodeIdSplatRoute: typeof ApiDpNodeIdSplatRoute
 }
 
@@ -199,6 +251,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nodes': {
@@ -221,6 +280,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/nodes/$id'
       preLoaderRoute: typeof NodesIdRouteImport
       parentRoute: typeof NodesRoute
+    }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/status': {
+      id: '/api/auth/status'
+      path: '/api/auth/status'
+      fullPath: '/api/auth/status'
+      preLoaderRoute: typeof ApiAuthStatusRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/nodes/$id': {
       id: '/api/nodes/$id'
@@ -357,8 +437,12 @@ const ApiNodesRouteWithChildren = ApiNodesRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   NodesRoute: NodesRouteWithChildren,
   ApiNodesRoute: ApiNodesRouteWithChildren,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiAuthStatusRoute: ApiAuthStatusRoute,
   ApiDpNodeIdSplatRoute: ApiDpNodeIdSplatRoute,
 }
 export const routeTree = rootRouteImport
@@ -366,10 +450,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

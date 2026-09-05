@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Button } from "#/components/ui/button"
 import { dpGet } from "#/lib/dataplane/client"
+import { POLL } from "#/lib/poll"
 
 type StickTable = {
   name: string
@@ -45,7 +46,7 @@ export function StickTablesTab({ nodeId }: { nodeId: string }) {
     queryKey: ["stick-tables", nodeId],
     queryFn: () => dpGet<StickTable[]>(nodeId, "services/haproxy/runtime/stick_tables"),
     enabled: mounted,
-    refetchInterval: 15_000,
+    refetchInterval: POLL.STICK,
   })
   const tables = tablesQ.data ?? []
   const effectiveName = selected || tables[0]?.name || ""
@@ -58,7 +59,7 @@ export function StickTablesTab({ nodeId }: { nodeId: string }) {
         `services/haproxy/runtime/stick_tables/${encodeURIComponent(effectiveName)}/entries?count=${pageSize}&offset=${offset}`,
       ),
     enabled: mounted && Boolean(effectiveName),
-    refetchInterval: 15_000,
+    refetchInterval: POLL.STICK,
   })
   const entries = entriesQ.data ?? []
   const table = tables.find((t) => t.name === effectiveName)

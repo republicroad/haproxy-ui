@@ -48,6 +48,7 @@ import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
 import { TrafficTab } from "#/components/TrafficTab"
 import { StickTablesTab } from "#/components/StickTablesTab"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
+import { POLL } from "#/lib/poll"
 import { diffLines } from "#/lib/diff"
 
 const TABS = ["overview", "frontends", "backends", "traffic", "acls", "maps", "stats", "stick", "history", "raw"] as const
@@ -73,7 +74,7 @@ function NodeDetail() {
     queryKey: ["info", id],
     queryFn: () => dpGet<Record<string, unknown>>(id, "services/haproxy/runtime/info"),
     enabled: mounted && tab === "overview",
-    refetchInterval: 15_000,
+    refetchInterval: POLL.NODES,
   })
   const feQ = useQuery({
     queryKey: ["frontends", id],
@@ -567,7 +568,7 @@ function StatsTab({
       return rows
     },
     enabled: mounted,
-    refetchInterval: 10_000,
+    refetchInterval: POLL.STATS,
   })
 
   const rows = statsQ.data ?? []

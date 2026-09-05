@@ -153,6 +153,6 @@ Browser ─┬─ /api/nodes (CRUD, test, export/import, diff) ──> TanStack 
 
 ## Roadmap
 
-- Frontend bind editing (full-section replace with confirmation)
 - Optional SSE push to replace some polling
 - Multi-user accounts with roles (currently single user via env)
+- Advanced traffic rules management (HTTP redirect/rewrite)

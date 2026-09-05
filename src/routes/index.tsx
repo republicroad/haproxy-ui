@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { NodesTable } from "#/components/NodesTable"
 import { FleetHealth } from "#/components/FleetHealth"
 import type { NodeRow } from "#/lib/types"
+import { POLL } from "#/lib/poll"
 
 async function fetchNodes(): Promise<NodeRow[]> {
   const res = await fetch("/api/nodes")
@@ -39,7 +40,7 @@ function Overview() {
   const { data, isLoading } = useQuery({
     queryKey: ["nodes"],
     queryFn: fetchNodes,
-    refetchInterval: 15_000,
+    refetchInterval: POLL.NODES,
   })
   const nodes = data ?? []
   const up = nodes.filter((n) => n.status === "up").length

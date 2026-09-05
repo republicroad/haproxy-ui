@@ -9,6 +9,7 @@ import { NodesImportExportButtons } from "#/components/ImportExportButtons"
 import { CompareModal } from "#/components/CompareModal"
 import { Button } from "#/components/ui/button"
 import type { NodeRow } from "#/lib/types"
+import { POLL } from "#/lib/poll"
 
 export const NODES_QUERY_KEY = ["nodes"] as const
 
@@ -38,7 +39,7 @@ function NodesPage() {
   const { data, isLoading } = useQuery({
     queryKey: NODES_QUERY_KEY,
     queryFn: fetchNodes,
-    refetchInterval: 15_000,
+    refetchInterval: POLL.NODES,
   })
   const nodes = data ?? []
 

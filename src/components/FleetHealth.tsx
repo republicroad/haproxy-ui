@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { AlertTriangle, Bell, RefreshCw } from "lucide-react"
 import { Badge } from "#/components/reui/badge"
 import { Button } from "#/components/ui/button"
+import { POLL } from "#/lib/poll"
 import { Input } from "#/components/ui/input"
 import { Label } from "#/components/ui/label"
 import { Checkbox } from "#/components/ui/checkbox"
@@ -174,7 +175,7 @@ export function FleetHealth() {
       if (!res.ok) throw new Error("failed to load health summary")
       return res.json()
     },
-    refetchInterval: 30_000,
+    refetchInterval: POLL.HEALTH,
   })
 
   const refresh = () => q.refetch()

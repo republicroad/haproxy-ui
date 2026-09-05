@@ -6,6 +6,7 @@ import { Badge } from "#/components/reui/badge"
 import { Button } from "#/components/ui/button"
 import { GridSearchInput } from "#/components/GridSearchInput"
 import { dpGet } from "#/lib/dataplane/client"
+import { POLL } from "#/lib/poll"
 
 type NativeStatStats = {
   scur?: number
@@ -123,7 +124,7 @@ export function TrafficTab({ nodeId }: { nodeId: string }) {
     queryFn: () =>
       dpGet<{ stats?: NativeStat[] }>(nodeId, "services/haproxy/stats/native"),
     enabled: mounted,
-    refetchInterval: 30_000,
+    refetchInterval: POLL.TRAFFIC,
   })
 
   const all = (q.data?.stats ?? []).filter((s) =>

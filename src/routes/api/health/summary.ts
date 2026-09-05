@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { publish } from "#/lib/events"
 import {
   getAlertSettings,
   getAlertState,
@@ -162,6 +163,14 @@ export const Route = createFileRoute("/api/health/summary")({
           })
           // state-transition alerting (up->down and recovery), webhook-gated
           const prev = getAlertState(n.id)
+          const flipped = (prev.lastOk === true && !probe.ok) || (prev.lastOk === false && probe.ok)
+          if (flipped) {
+            publish({
+              type: "node_status",
+              nodeId: n.id,
+              status: probe.ok ? "up" : "down",
+            })
+          }
           if (prev.lastOk === true && !probe.ok) {
             await fireAlert({
               event: "node_down",

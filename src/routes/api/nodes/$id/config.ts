@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { getNode, insertChange } from "#/lib/db"
 import { actorFromRequest } from "#/lib/auth"
+import { publish } from "#/lib/events"
 import { proxyToNode } from "#/lib/dataplane/proxy"
 import { exportNodeConfig } from "#/lib/configExport"
 
@@ -273,6 +274,7 @@ export const Route = createFileRoute("/api/nodes/$id/config")({
                 actor,
               })
             }
+            publish({ type: "change", nodeId: params.id })
           } catch {
             // history recording must never break the import itself
           }

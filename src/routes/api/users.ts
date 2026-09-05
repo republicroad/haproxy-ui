@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { hashPassword, roleFromRequest } from "#/lib/auth"
 import { getUser, insertUser, listUsers } from "#/lib/db"
+import { publish } from "#/lib/events"
 import { z } from "zod"
 import { fieldErrors } from "#/lib/schemas"
 
@@ -49,6 +50,7 @@ export const Route = createFileRoute("/api/users")({
           passHash: hashPassword(parsed.data.password),
           role: parsed.data.role,
         })
+        publish({ type: "users_changed" })
         return Response.json({ ok: true, username: parsed.data.username }, { status: 201 })
       },
     },

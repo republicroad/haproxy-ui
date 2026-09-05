@@ -6,6 +6,7 @@ import {
   getUser,
   updateUser,
 } from "#/lib/db"
+import { publish } from "#/lib/events"
 import { z } from "zod"
 import { fieldErrors } from "#/lib/schemas"
 
@@ -53,6 +54,7 @@ export const Route = createFileRoute("/api/users/$username")({
               ? hashPassword(parsed.data.password)
               : undefined,
         })
+        publish({ type: "users_changed" })
         return Response.json({ ok: true })
       },
       DELETE: async ({ params, request }) => {
@@ -70,6 +72,7 @@ export const Route = createFileRoute("/api/users/$username")({
           )
         }
         deleteUser(params.username)
+        publish({ type: "users_changed" })
         return Response.json({ ok: true })
       },
     },

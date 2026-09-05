@@ -7,6 +7,7 @@ import {
   trimChanges,
 } from "#/lib/db"
 import { actorFromRequest } from "#/lib/auth"
+import { publish } from "#/lib/events"
 import { changeMetaSchema, fieldErrors } from "#/lib/schemas"
 
 export const Route = createFileRoute("/api/nodes/$id/changes")({
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/api/nodes/$id/changes")({
           rawAfter: meta.rawAfter ?? null,
           actor: actorFromRequest(request),
         })
+        publish({ type: "change", nodeId: params.id })
         return Response.json({ id }, { status: 201 })
       },
       DELETE: async ({ params, request }) => {

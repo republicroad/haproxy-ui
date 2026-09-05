@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as NodesIndexRouteImport } from './routes/nodes.index'
@@ -53,6 +54,11 @@ const NodesRoute = NodesRouteImport.update({
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEventsRoute = ApiEventsRouteImport.update({
+  id: '/api/events',
+  path: '/api/events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNodesRoute = ApiNodesRouteImport.update({
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
   '/users': typeof UsersRoute
+  '/api/events': typeof ApiEventsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/users': typeof UsersRoute
+  '/api/events': typeof ApiEventsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
   '/users': typeof UsersRoute
+  '/api/events': typeof ApiEventsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
@@ -251,6 +260,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/nodes'
     | '/users'
+    | '/api/events'
     | '/api/nodes'
     | '/api/users'
     | '/nodes/$id'
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/users'
+    | '/api/events'
     | '/api/nodes'
     | '/api/users'
     | '/nodes/$id'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/nodes'
     | '/users'
+    | '/api/events'
     | '/api/nodes'
     | '/api/users'
     | '/nodes/$id'
@@ -332,6 +344,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NodesRoute: typeof NodesRouteWithChildren
   UsersRoute: typeof UsersRoute
+  ApiEventsRoute: typeof ApiEventsRoute
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
   ApiUsersRoute: typeof ApiUsersRouteWithChildren
   ApiAlertsSettingsRoute: typeof ApiAlertsSettingsRoute
@@ -371,6 +384,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/events': {
+      id: '/api/events'
+      path: '/api/events'
+      fullPath: '/api/events'
+      preLoaderRoute: typeof ApiEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nodes': {
@@ -611,6 +631,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NodesRoute: NodesRouteWithChildren,
   UsersRoute: UsersRoute,
+  ApiEventsRoute: ApiEventsRoute,
   ApiNodesRoute: ApiNodesRouteWithChildren,
   ApiUsersRoute: ApiUsersRouteWithChildren,
   ApiAlertsSettingsRoute: ApiAlertsSettingsRoute,

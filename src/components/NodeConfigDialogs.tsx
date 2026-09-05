@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { Button } from "#/components/ui/button"
 import { Modal } from "#/components/Modal"
 import {
@@ -172,6 +173,9 @@ export function FrontendDialog({
       )
     },
     onSuccess: () => {
+      toast.success(
+        edit ? `Frontend "${edit.name}" updated` : `Frontend "${form.name}" created`,
+      )
       onCreated()
       onClose()
     },
@@ -359,6 +363,9 @@ export function BackendDialog({
       )
     },
     onSuccess: () => {
+      toast.success(
+        edit ? `Backend "${edit.name}" updated` : `Backend "${form.name}" created`,
+      )
       onCreated()
       onClose()
     },

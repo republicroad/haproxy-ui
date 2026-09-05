@@ -1,0 +1,15 @@
+import { spawnSync } from "node:child_process"
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+const dbPath = join(mkdtempSync(join(tmpdir(), "haproxy-ui-e2e-")), "e2e.db")
+
+spawnSync(
+  process.execPath,
+  ["node_modules/vite/bin/vite.js", "dev", "--port", "3999", "--strictPort"],
+  {
+    stdio: "inherit",
+    env: { ...process.env, HAPROXY_UI_DB: dbPath, MOCK_PORT: "9090" },
+  },
+)

@@ -17,3 +17,6 @@ haproxy/v3bin/
 haproxy/*.tar.gz
 haproxy/run/
 haproxy/*/run/
+
+test-results/
+playwright-report/

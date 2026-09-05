@@ -17,6 +17,7 @@ const emptyForm = {
   apiUrl: "",
   apiUser: "admin",
   apiPass: "admin",
+  group: "",
 }
 
 export function NodeFormDialog({
@@ -44,6 +45,7 @@ export function NodeFormDialog({
               apiUrl: node.apiUrl,
               apiUser: node.apiUser,
               apiPass: node.apiPass,
+              group: node.group ?? "",
             }
           : emptyForm,
       )
@@ -134,6 +136,16 @@ export function NodeFormDialog({
             />
             {err("apiPass")}
           </div>
+        </div>
+        <div>
+          <Label className="mb-1 block">Group (optional)</Label>
+          <Input
+            className={field}
+            value={form.group}
+            onChange={(e) => setForm({ ...form, group: e.target.value })}
+            placeholder="e.g. eu-prod"
+          />
+          {err("group")}
         </div>
         {mut.isError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">

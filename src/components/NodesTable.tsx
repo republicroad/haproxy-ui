@@ -59,6 +59,16 @@ export function NodesTable({
       ),
     },
     { accessorKey: "apiUrl", header: "API URL" },
+    {
+      accessorKey: "group",
+      header: "Group",
+      cell: ({ row }) =>
+        row.original.group ? (
+          <Badge variant="secondary">{row.original.group}</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
     { accessorKey: "haproxyVersion", header: "Version" },
     {
       id: "status",

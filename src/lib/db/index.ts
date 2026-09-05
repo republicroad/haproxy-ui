@@ -11,6 +11,7 @@ export type NodeRow = {
   status: string
   lastSeen: number | null
   createdAt: number
+  group: string | null
 }
 
 const globalForDb = globalThis as unknown as { __haproxyUiDb?: DatabaseSync }
@@ -31,7 +32,8 @@ db.exec(`
     haproxy_version TEXT,
     status TEXT NOT NULL DEFAULT 'unknown',
     last_seen INTEGER,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    node_group TEXT
   );
   CREATE TABLE IF NOT EXISTS config_changes (
     id TEXT PRIMARY KEY,
@@ -99,6 +101,11 @@ try {
 } catch {
   // already migrated
 }
+try {
+  db.exec("ALTER TABLE nodes ADD COLUMN node_group TEXT")
+} catch {
+  // already migrated
+}
 
 // Kick off the background maintenance scheduler (retention, backups).
 // Dynamic import so the module itself stays test-friendly; unref'd timers.
@@ -134,6 +141,7 @@ type NodeSqliteRow = {
   status: string
   last_seen: number | null
   created_at: number
+  node_group: string | null
 }
 
 function rowToNode(row: NodeSqliteRow): NodeRow {
@@ -147,6 +155,7 @@ function rowToNode(row: NodeSqliteRow): NodeRow {
     status: row.status,
     lastSeen: row.last_seen ?? null,
     createdAt: row.created_at,
+    group: row.node_group ?? null,
   }
 }
 
@@ -165,13 +174,15 @@ export function getNode(id: string): NodeRow | undefined {
 
 export function insertNode(n: NodeRow): void {
   db.prepare(
-    "INSERT INTO nodes (id, name, api_url, api_user, api_pass, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(n.id, n.name, n.apiUrl, n.apiUser, encryptSecret(n.apiPass), n.status, n.createdAt)
+    "INSERT INTO nodes (id, name, api_url, api_user, api_pass, status, created_at, node_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(n.id, n.name, n.apiUrl, n.apiUser, encryptSecret(n.apiPass), n.status, n.createdAt, n.group)
 }
 
 export function updateNode(
   id: string,
-  patch: Partial<Pick<NodeRow, "name" | "apiUrl" | "apiUser" | "apiPass" | "haproxyVersion" | "status" | "lastSeen">>,
+  patch: Partial<
+    Pick<NodeRow, "name" | "apiUrl" | "apiUser" | "apiPass" | "haproxyVersion" | "status" | "lastSeen" | "group">
+  >,
 ): void {
   const sets: string[] = []
   const vals: unknown[] = []
@@ -202,6 +213,10 @@ export function updateNode(
   if (patch.lastSeen !== undefined) {
     sets.push("last_seen = ?")
     vals.push(patch.lastSeen)
+  }
+  if (patch.group !== undefined) {
+    sets.push("node_group = ?")
+    vals.push(patch.group)
   }
   if (sets.length === 0) return
   vals.push(id)

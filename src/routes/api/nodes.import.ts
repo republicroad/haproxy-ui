@@ -51,6 +51,7 @@ export const Route = createFileRoute("/api/nodes/import")({
             status: "unknown",
             lastSeen: null,
             createdAt: Date.now(),
+            group: parsed.data.group ?? null,
           })
           imported.push(parsed.data.name)
         }

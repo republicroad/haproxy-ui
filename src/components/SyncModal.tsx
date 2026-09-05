@@ -285,6 +285,43 @@ export function SyncModal({
 
           <div>
             <Label className="mb-2 block font-medium">Target nodes</Label>
+            {(() => {
+              const groups = [
+                ...new Set(
+                  otherNodes
+                    .map((n) => (n as { group?: string | null }).group)
+                    .filter((g): g is string => Boolean(g)),
+                ),
+              ]
+              return groups.length > 0 ? (
+                <div className="mb-2 flex flex-wrap items-center gap-1">
+                  <span className="text-xs text-muted-foreground">select group:</span>
+                  {groups.map((g) => (
+                    <Button
+                      key={g}
+                      size="xs"
+                      variant="outline"
+                      onClick={() => {
+                        const ids = otherNodes
+                          .filter((n) => (n as { group?: string | null }).group === g)
+                          .map((n) => n.id)
+                        setTargets((s) => {
+                          const allIn = ids.every((id) => s.has(id))
+                          const next = new Set(s)
+                          for (const id of ids) {
+                            if (allIn) next.delete(id)
+                            else next.add(id)
+                          }
+                          return next
+                        })
+                      }}
+                    >
+                      {g}
+                    </Button>
+                  ))}
+                </div>
+              ) : null
+            })()}
             <div className="grid grid-cols-2 gap-1">
               {otherNodes.map((n) => (
                 <label key={n.id} className="flex items-center gap-2 py-0.5 text-sm">
@@ -293,6 +330,11 @@ export function SyncModal({
                     onCheckedChange={() => setTargets((s) => toggleSet(s, n.id))}
                   />
                   {n.name}
+                  {(n as { group?: string | null }).group && (
+                    <span className="text-xs text-muted-foreground">
+                      ({(n as { group?: string | null }).group})
+                    </span>
+                  )}
                 </label>
               ))}
               {otherNodes.length === 0 && (

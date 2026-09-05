@@ -35,6 +35,7 @@ export const Route = createFileRoute("/api/nodes")({
           status: "unknown",
           lastSeen: null,
           createdAt: now,
+          group: input.group ?? null,
         })
         const created = listNodes().find((n) => n.id === id)
         return Response.json(created, { status: 201 })

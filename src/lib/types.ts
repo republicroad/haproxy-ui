@@ -8,6 +8,7 @@ export type NodeRow = {
   status: string
   lastSeen: number | null
   createdAt: number
+  group: string | null
 }
 
 export type Frontend = {

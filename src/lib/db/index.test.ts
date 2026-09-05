@@ -32,6 +32,7 @@ const node = (id: string, name = "n1") => ({
   status: "unknown",
   lastSeen: null,
   createdAt: 1_000,
+  group: null,
 })
 
 const change = (id: string, nodeId: string, ts: number) => ({

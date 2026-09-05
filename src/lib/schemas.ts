@@ -27,6 +27,7 @@ export const nodeInputSchema = z.object({
   }),
   apiUser: z.string().trim().min(1).default("admin"),
   apiPass: z.string().min(1).default("admin"),
+  group: z.string().trim().max(32).optional(),
 })
 
 export const nodePatchSchema = z
@@ -40,6 +41,7 @@ export const nodePatchSchema = z
     haproxyVersion: z.string().nullable().optional(),
     status: z.enum(["up", "down", "unknown"]).optional(),
     lastSeen: z.number().nullable().optional(),
+    group: z.string().trim().max(32).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "empty patch" })
 

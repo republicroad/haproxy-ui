@@ -107,6 +107,11 @@ const server = createServer((req, res) => {
       return send(res, 201, json)
     }
     const feMatch = p.match(/^services\/haproxy\/configuration\/frontends\/(.+)$/)
+    if (feMatch && method === "GET") {
+      const f = frontends.find((x) => x.name === decodeURIComponent(feMatch[1]))
+      if (!f) return send(res, 404, { code: 404, message: "frontend not found" })
+      return send(res, 200, f)
+    }
     if (feMatch && method === "DELETE") {
       const i = frontends.findIndex((f) => f.name === decodeURIComponent(feMatch[1]))
       if (i >= 0) frontends.splice(i, 1)
@@ -116,8 +121,18 @@ const server = createServer((req, res) => {
       const name = decodeURIComponent(feMatch[1])
       const i = frontends.findIndex((f) => f.name === name)
       if (i < 0) return send(res, 404, { code: 404, message: "frontend not found" })
-      // full_section=false semantics: only section fields replaced
-      frontends[i] = { ...frontends[i], ...json, name }
+      if (url.searchParams.get("full_section") === "true") {
+        // full_section=true semantics: entire section replaced. Accept the
+        // v3-style binds map and store it as the v2-style bind array.
+        const { binds, ...rest } = json
+        const bindArr = binds
+          ? Object.entries(binds).map(([k, v]) => ({ name: k, ...v }))
+          : undefined
+        frontends[i] = { ...frontends[i], ...rest, name, ...(bindArr ? { bind: bindArr } : {}) }
+      } else {
+        // full_section=false semantics: only section fields replaced
+        frontends[i] = { ...frontends[i], ...json, name }
+      }
       return send(res, 200, frontends[i])
     }
 

@@ -91,6 +91,10 @@ export function FrontendDialog({
     address: "*",
     port: 80,
   })
+  const [editBinds, setEditBinds] = useState<
+    { address: string; port: number }[] | null
+  >(null)
+  const [confirmRebuild, setConfirmRebuild] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -104,6 +108,12 @@ export function FrontendDialog({
         address: firstBind?.address ?? "*",
         port: firstBind?.port ?? 80,
       })
+      setEditBinds(
+        edit && Array.isArray(edit.bind)
+          ? edit.bind.map((b) => ({ address: b.address, port: b.port }))
+          : null,
+      )
+      setConfirmRebuild(false)
       setErrors({})
     }
   }, [open, edit])
@@ -116,21 +126,59 @@ export function FrontendDialog({
   const mut = useMutation({
     mutationFn: () => {
       if (edit) {
-        // Replace semantics (full_section=false): only section fields are
-        // edited; binds stay untouched on the node.
+        const bindsChanged =
+          editBinds !== null &&
+          JSON.stringify(editBinds) !==
+            JSON.stringify(
+              (Array.isArray(edit.bind) ? edit.bind : []).map((b) => ({
+                address: b.address,
+                port: b.port,
+              })),
+            )
+        if (bindsChanged && !confirmRebuild) {
+          // first click arms the destructive rebuild confirmation
+          setConfirmRebuild(true)
+          throw new Error("Confirm section rebuild to apply bind changes")
+        }
+        // With bind edits: full-section replace (GET round-trip then PUT
+        // with full_section=true). Otherwise: section fields only.
         return withTransaction(
           nodeId,
           async (tx) => {
-            await dpPut(
-              nodeId,
-              `services/haproxy/configuration/frontends/${encodeURIComponent(edit.name)}`,
-              {
-                name: edit.name,
-                mode: form.mode,
-                default_backend: form.default_backend || undefined,
-              },
-              tx,
-            )
+            if (bindsChanged) {
+              const full = await dpGet<Frontend>(
+                nodeId,
+                `services/haproxy/configuration/frontends/${encodeURIComponent(edit.name)}?full_section=true`,
+              )
+              await dpPut(
+                nodeId,
+                `services/haproxy/configuration/frontends/${encodeURIComponent(edit.name)}?full_section=true`,
+                {
+                  ...full,
+                  name: edit.name,
+                  mode: form.mode,
+                  default_backend: form.default_backend || undefined,
+                  binds: Object.fromEntries(
+                    (editBinds ?? []).map((b) => [
+                      `${b.address}:${b.port}`,
+                      { address: b.address, port: b.port },
+                    ]),
+                  ),
+                },
+                tx,
+              )
+            } else {
+              await dpPut(
+                nodeId,
+                `services/haproxy/configuration/frontends/${encodeURIComponent(edit.name)}`,
+                {
+                  name: edit.name,
+                  mode: form.mode,
+                  default_backend: form.default_backend || undefined,
+                },
+                tx,
+              )
+            }
           },
           {
             kind: "update",
@@ -139,6 +187,7 @@ export function FrontendDialog({
             payload: {
               mode: form.mode,
               default_backend: form.default_backend || undefined,
+              ...(bindsChanged ? { binds: editBinds } : {}),
             },
           },
         )
@@ -254,10 +303,62 @@ export function FrontendDialog({
           </div>
         )}
         {edit && (
-          <p className="text-xs text-muted-foreground">
-            Edit mode changes mode/default_backend only. Binds on the node are
-            left untouched.
-          </p>
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground">Binds</div>
+            {(editBinds ?? []).map((b, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  className={`${inputCls} flex-1`}
+                  value={b.address}
+                  onChange={(e) => {
+                    const next = [...(editBinds ?? [])]
+                    next[i] = { ...b, address: e.target.value }
+                    setEditBinds(next)
+                  }}
+                  aria-label={`bind ${i + 1} address`}
+                />
+                <NumberField
+                  value={b.port}
+                  onValueChange={(v) => {
+                    const next = [...(editBinds ?? [])]
+                    next[i] = { ...b, port: v ?? 0 }
+                    setEditBinds(next)
+                  }}
+                  min={1}
+                  max={65535}
+                >
+                  <NumberFieldGroup>
+                    <NumberFieldDecrement />
+                    <NumberFieldInput />
+                    <NumberFieldIncrement />
+                  </NumberFieldGroup>
+                </NumberField>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    setEditBinds((prev) => (prev ?? []).filter((_, j) => j !== i))
+                  }
+                  aria-label={`remove bind ${i + 1}`}
+                >
+                  ✕
+                </Button>
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditBinds([...(editBinds ?? []), { address: "*", port: 80 }])}
+            >
+              Add bind
+            </Button>
+            {confirmRebuild && (
+              <p className="text-xs text-destructive">
+                Bind changes replace the whole frontend section on the node
+                (unlisted options are removed). Click Confirm rebuild to apply.
+              </p>
+            )}
+          </div>
         )}
         {mut.isError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -271,8 +372,15 @@ export function FrontendDialog({
           <Button
             onClick={() => mut.mutate()}
             disabled={mut.isPending || (!edit && !form.name)}
+            variant={edit && confirmRebuild ? "destructive" : "default"}
           >
-            {mut.isPending ? "Saving…" : edit ? "Save changes" : "Create"}
+            {mut.isPending
+              ? "Saving…"
+              : edit
+                ? confirmRebuild
+                  ? "Confirm rebuild"
+                  : "Save changes"
+                : "Create"}
           </Button>
         </div>
       </div>

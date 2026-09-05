@@ -46,6 +46,7 @@ const change = (id: string, nodeId: string, ts: number) => ({
   txId: null,
   reverted: 0,
   rawAfter: null,
+  actor: null,
 })
 
 describe("db node CRUD", () => {

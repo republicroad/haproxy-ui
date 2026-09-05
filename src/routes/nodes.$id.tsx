@@ -689,6 +689,7 @@ type ChangeListItem = {
   parent: string | null
   txId: string | null
   reverted: number
+  actor: string | null
 }
 
 async function fetchChanges(nodeId: string): Promise<{
@@ -850,6 +851,11 @@ function HistoryTab({ nodeId }: { nodeId: string }) {
       header: "Status",
       cell: ({ row }) =>
         row.original.reverted ? <Badge variant="secondary">reverted</Badge> : null,
+    },
+    {
+      accessorKey: "actor",
+      header: "By",
+      cell: ({ row }) => row.original.actor ?? "—",
     },
     {
       id: "actions",

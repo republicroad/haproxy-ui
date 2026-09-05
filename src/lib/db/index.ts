@@ -44,7 +44,8 @@ db.exec(`
     payload TEXT,
     tx_id TEXT,
     reverted INTEGER NOT NULL DEFAULT 0,
-    raw_after TEXT
+    raw_after TEXT,
+    actor TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_changes_node ON config_changes(node_id, ts);
   CREATE TABLE IF NOT EXISTS node_health_checks (
@@ -68,6 +69,14 @@ db.exec(`
     last_alert_ts INTEGER NOT NULL DEFAULT 0
   );
 `)
+
+// Lightweight migration for databases created before the actor column
+// (idempotent: ALTER fails silently when the column already exists).
+try {
+  db.exec("ALTER TABLE config_changes ADD COLUMN actor TEXT")
+} catch {
+  // already migrated
+}
 
 /** Encrypt any legacy plaintext api_pass values when HAPROXY_UI_KEY is set. */
 function migratePlaintextSecrets(): void {
@@ -187,6 +196,7 @@ export type ChangeRow = {
   txId: string | null
   reverted: number
   rawAfter: string | null
+  actor: string | null
 }
 
 type ChangeSqliteRow = {
@@ -201,6 +211,7 @@ type ChangeSqliteRow = {
   tx_id: string | null
   reverted: number
   raw_after: string | null
+  actor: string | null
 }
 
 function rowToChange(row: ChangeSqliteRow): ChangeRow {
@@ -216,12 +227,13 @@ function rowToChange(row: ChangeSqliteRow): ChangeRow {
     txId: row.tx_id ?? null,
     reverted: row.reverted,
     rawAfter: row.raw_after ?? null,
+    actor: row.actor ?? null,
   }
 }
 
 export function insertChange(c: ChangeRow): void {
   db.prepare(
-    "INSERT INTO config_changes (id, node_id, ts, kind, resource, target, parent, payload, tx_id, reverted, raw_after) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO config_changes (id, node_id, ts, kind, resource, target, parent, payload, tx_id, reverted, raw_after, actor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     c.id,
     c.nodeId,
@@ -234,6 +246,7 @@ export function insertChange(c: ChangeRow): void {
     c.txId,
     c.reverted,
     c.rawAfter,
+    c.actor,
   )
 }
 
@@ -242,7 +255,7 @@ export function listChangesByNode(nodeId: string, limit = 50): Omit<ChangeRow, "
   return (
     db
       .prepare(
-        "SELECT id, node_id, ts, kind, resource, target, parent, payload, tx_id, reverted FROM config_changes WHERE node_id = ? ORDER BY ts DESC LIMIT ?",
+        "SELECT id, node_id, ts, kind, resource, target, parent, payload, tx_id, reverted, actor FROM config_changes WHERE node_id = ? ORDER BY ts DESC LIMIT ?",
       )
       .all(nodeId, limit) as ChangeSqliteRow[]
   ).map((r) => {

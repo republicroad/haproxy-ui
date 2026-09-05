@@ -6,6 +6,7 @@ import {
   listChangesByNode,
   trimChanges,
 } from "#/lib/db"
+import { actorFromRequest } from "#/lib/auth"
 import { changeMetaSchema, fieldErrors } from "#/lib/schemas"
 
 export const Route = createFileRoute("/api/nodes/$id/changes")({
@@ -45,6 +46,7 @@ export const Route = createFileRoute("/api/nodes/$id/changes")({
           txId: meta.txId ?? null,
           reverted: 0,
           rawAfter: meta.rawAfter ?? null,
+          actor: actorFromRequest(request),
         })
         return Response.json({ id }, { status: 201 })
       },

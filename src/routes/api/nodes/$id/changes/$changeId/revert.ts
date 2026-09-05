@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { getChange, insertChange, markReverted } from "#/lib/db"
+import { actorFromRequest } from "#/lib/auth"
 import { proxyToNode } from "#/lib/dataplane/proxy"
 
 async function dp(
@@ -20,7 +21,7 @@ async function dp(
 export const Route = createFileRoute("/api/nodes/$id/changes/$changeId/revert")({
   server: {
     handlers: {
-      POST: async ({ params }) => {
+      POST: async ({ params, request }) => {
         const change = getChange(params.changeId)
         if (!change || change.nodeId !== params.id) {
           return Response.json({ error: "not found" }, { status: 404 })
@@ -155,6 +156,7 @@ export const Route = createFileRoute("/api/nodes/$id/changes/$changeId/revert")(
           txId: tx.id,
           reverted: 0,
           rawAfter,
+          actor: actorFromRequest(request) ?? `revert-of:${change.id}`,
         })
         return Response.json({ ok: true, revertId: id })
       },

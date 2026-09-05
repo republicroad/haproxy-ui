@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { getNode, insertChange } from "#/lib/db"
+import { actorFromRequest } from "#/lib/auth"
 import { proxyToNode } from "#/lib/dataplane/proxy"
 import { exportNodeConfig } from "#/lib/configExport"
 
@@ -248,6 +249,7 @@ export const Route = createFileRoute("/api/nodes/$id/config")({
 
         if (metas.length > 0) {
           try {
+            const actor = actorFromRequest(request)
             const rawRes = await dpJson<string>(
               params.id,
               "GET",
@@ -268,6 +270,7 @@ export const Route = createFileRoute("/api/nodes/$id/config")({
                 txId: tx.id,
                 reverted: 0,
                 rawAfter: raw,
+                actor,
               })
             }
           } catch {

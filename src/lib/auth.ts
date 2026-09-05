@@ -89,6 +89,17 @@ export function sessionClearCookieHeader(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
 }
 
+/**
+ * Audit actor for the request: the configured UI user when a valid session
+ * cookie is present, null when auth is disabled (single-user local mode) or
+ * the session is missing/invalid.
+ */
+export function actorFromRequest(request: Request): string | null {
+  if (!authEnabled()) return null
+  const token = readSessionCookie(request)
+  return verifySessionToken(token) ? (process.env.HAPROXY_UI_USER ?? null) : null
+}
+
 /** Naive fixed-window login rate limiting (per IP, in-memory). */
 const attempts = new Map<string, { count: number; windowStart: number }>()
 const WINDOW_MS = 60_000

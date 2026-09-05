@@ -15,4 +15,22 @@ export default defineConfig({
   },
   globalSetup: "tests/global-setup.mjs",
   globalTeardown: "tests/global-teardown.mjs",
+  projects: [
+    {
+      name: "setup",
+      testMatch: /auth\.setup\.mjs/,
+    },
+    {
+      name: "app",
+      testMatch: /e2e\.spec\.mjs/,
+      use: { storageState: "playwright/.auth/admin.json" },
+      dependencies: ["setup"],
+    },
+    {
+      name: "viewer",
+      testMatch: /viewer\.spec\.mjs/,
+      use: { storageState: "playwright/.auth/viewer.json" },
+      dependencies: ["setup"],
+    },
+  ],
 })

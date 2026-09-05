@@ -28,8 +28,10 @@ Query/Table, `node:sqlite`, and zod.
 - **Stick tables** — read-only viewer with pagination for runtime stick
   table entries.
 - **Change history** — every configuration change is recorded with a raw
-  config snapshot; LCS-based diffs and one-click revert (create ⇄ delete)
-  via a validated transaction.
+  config snapshot and the acting user; LCS-based diffs and one-click
+  revert (create ⇄ delete) via a validated transaction.
+- **HTTP request rules** — manage redirect and deny rules per
+  frontend/backend with optional conditions, transactional and recorded.
 - **Audit attribution** — when authentication is enabled, every change is
   attributed to the signed-in user (visible in the History tab).
 - **Multi-node sync** — push selected frontends/backends (with servers)
@@ -45,8 +47,12 @@ Query/Table, `node:sqlite`, and zod.
   node down/recovery transitions, with a 5-minute cooldown and a
   "send test" button.
 - **Security** — optional session-based authentication (signed HttpOnly
-  cookie, login page, logout revocation, login rate limiting) and
-  AES-256-GCM encrypted credential storage at rest.
+  cookie, login page, logout revocation, login rate limiting),
+  AES-256-GCM encrypted credential storage at rest, and multi-user
+  accounts with `admin`/`viewer` roles (viewer is read-only, last-admin
+  protection, user management UI).
+- **Live updates** — server-sent events push config changes, node status
+  flips and user changes to the UI; polling remains as a fallback.
 - **Retention & backups** — hourly maintenance loop purges change
   history past the retention window, trims health-check history, and
   (optionally) writes daily config backups to disk.
@@ -153,6 +159,7 @@ Browser ─┬─ /api/nodes (CRUD, test, export/import, diff) ──> TanStack 
 
 ## Roadmap
 
-- Optional SSE push to replace some polling
-- Multi-user accounts with roles (currently single user via env)
-- Advanced traffic rules management (HTTP redirect/rewrite)
+- SSL/TLS certificate management (dataplaneapi storage API)
+- Health-check parameter editing (interval / fall / rise)
+- Historical metric sampling with trend charts
+- Node groups/tags with group-scoped sync and drift checks

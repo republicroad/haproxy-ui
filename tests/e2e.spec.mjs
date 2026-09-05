@@ -119,7 +119,48 @@ test.describe.serial("haproxy-ui e2e", () => {
     test.skip(!nodeId, "node not created")
     await page.goto(`/nodes/${nodeId}`)
     await goTab(page, "traffic")
-    await expect(page.getByRole("heading", { name: "Frontends" })).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Backends" })).toBeVisible()
+    await expect(page.getByText("Frontends", { exact: true })).toBeVisible()
+    await expect(page.getByText("Backends", { exact: true })).toBeVisible()
+  })
+
+  test("ACLs tab: create and delete a redirect rule", async ({ page }) => {
+    test.skip(!nodeId, "node not created")
+    await page.goto(`/nodes/${nodeId}`)
+    // rules need a parent section; recreate the frontend if previous
+    // scenarios deleted it (mock is fresh per run)
+    await goTab(page, "frontends")
+    const hasFe = await page.getByRole("cell", { name: "fe_e2e" }).first().isVisible().catch(() => false)
+    if (!hasFe) {
+      await page.getByRole("button", { name: "New frontend" }).click()
+      await page.getByPlaceholder("name").fill("fe_e2e")
+      await page.getByPlaceholder("bind address").fill("*")
+      await page.getByRole("button", { name: "Create" }).click()
+      await expect(page.getByText('Frontend "fe_e2e" created')).toBeVisible({ timeout: 15_000 })
+    }
+    await goTab(page, "acls")
+    await page.getByPlaceholder("code (301/302/307/308)").fill("302")
+    await page.getByPlaceholder("destination (e.g. /new)").fill("/moved")
+    await page.getByRole("button", { name: "Add rule" }).click()
+    await expect(page.getByText("Request rule added")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("302 → /moved").first()).toBeVisible()
+    // remove it again to keep state clean
+    await page.getByRole("button", { name: "Delete" }).last().click()
+    await expect(page.getByText("Request rule removed")).toBeVisible({ timeout: 15_000 })
+  })
+
+  test("users page: create and delete a user", async ({ page }) => {
+    await page.goto("/users")
+    await expect(page.getByRole("heading", { name: "Users" })).toBeVisible()
+    const username = `u${Date.now().toString(36)}`
+    await page.getByLabel("username").fill(username)
+    await page.getByLabel("password").fill("secret123")
+    await page.getByRole("button", { name: "Create user" }).click()
+    await expect(page.getByText(`User "${username}" created`)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(username).first()).toBeVisible()
+    // delete it (the row's Delete button in that user's row)
+    const row = page.getByRole("row", { name: new RegExp(username) })
+    await row.getByRole("button", { name: "Delete" }).click()
+    await page.getByRole("button", { name: "Delete", exact: true }).last().click()
+    await expect(page.getByText(`User "${username}" deleted`)).toBeVisible({ timeout: 15_000 })
   })
 })

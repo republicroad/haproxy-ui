@@ -320,6 +320,59 @@ const server = createServer((req, res) => {
       return send(res, 200, { runtimeAPI: "/tmp/haproxy.sock", stats })
     }
 
+    // stick tables (read-only in mock)
+    if (p === "services/haproxy/runtime/stick_tables" && method === "GET") {
+      return send(res, 200, [
+        {
+          name: "ft_polysoft",
+          size: 100,
+          used: 2,
+          type: "ip",
+          fields: [
+            { field: "conn_cnt", type: "counter" },
+            { field: "http_req_rate", type: "rate", period: 10 },
+          ],
+        },
+      ])
+    }
+    const stickMatch = p.match(
+      /^services\/haproxy\/runtime\/stick_tables\/([^/]+)\/entries$/,
+    )
+    if (stickMatch && method === "GET") {
+      const all = [
+        {
+          id: "1",
+          key: "10.0.0.15",
+          use: true,
+          exp: 28,
+          conn_cnt: 5,
+          http_req_rate: 12,
+        },
+        {
+          id: "2",
+          key: "10.0.0.22",
+          use: true,
+          exp: 55,
+          conn_cnt: 2,
+          http_req_rate: 4,
+        },
+        {
+          id: "3",
+          key: "10.0.0.99",
+          use: false,
+          exp: 0,
+          conn_cnt: 0,
+          http_req_rate: 0,
+        },
+      ]
+      const count = url.searchParams.get("count")
+      const offset = Number(url.searchParams.get("offset") ?? 0)
+      let rows = all
+      if (offset > 0) rows = rows.slice(offset)
+      if (count !== null) rows = rows.slice(0, Math.max(1, Number(count)))
+      return send(res, 200, rows)
+    }
+
     return send(res, 404, { code: 404, message: `no mock for ${method} ${p}` })
   })
 })

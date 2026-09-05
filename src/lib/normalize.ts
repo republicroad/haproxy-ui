@@ -28,11 +28,12 @@ export function normalizeBackend(b: Backend): Backend {
 }
 
 export function normalizeFrontends(list: Frontend[] | null | undefined): Frontend[] {
-  return (list ?? []).map(normalizeFrontend)
+  // drop entries without a name: they break name-based filtering downstream
+  return (list ?? []).filter((f) => typeof f?.name === "string").map(normalizeFrontend)
 }
 
 export function normalizeBackends(list: Backend[] | null | undefined): Backend[] {
-  return (list ?? []).map(normalizeBackend)
+  return (list ?? []).filter((b) => typeof b?.name === "string").map(normalizeBackend)
 }
 
 /** Typed accessor for a (possibly map-shaped) servers field as an array. */

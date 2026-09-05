@@ -20,6 +20,7 @@ import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthStatusRouteImport } from './routes/api/auth/status'
 import { Route as ApiHealthSummaryRouteImport } from './routes/api/health/summary'
 import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
+import { Route as ApiNodesDiffRouteImport } from './routes/api/nodes.diff'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
@@ -84,6 +85,11 @@ const ApiNodesIdRoute = ApiNodesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiNodesRoute,
 } as any)
+const ApiNodesDiffRoute = ApiNodesDiffRouteImport.update({
+  id: '/diff',
+  path: '/diff',
+  getParentRoute: () => ApiNodesRoute,
+} as any)
 const ApiNodesExportRoute = ApiNodesExportRouteImport.update({
   id: '/export',
   path: '/export',
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/status': typeof ApiAuthStatusRoute
   '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
+  '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/api/auth/status': typeof ApiAuthStatusRoute
   '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
+  '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
@@ -181,6 +189,7 @@ export interface FileRoutesById {
   '/api/auth/status': typeof ApiAuthStatusRoute
   '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
+  '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/api/auth/status'
     | '/api/health/summary'
     | '/api/nodes/$id'
+    | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
     | '/api/dp/$nodeId/$'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/api/auth/status'
     | '/api/health/summary'
     | '/api/nodes/$id'
+    | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
     | '/api/dp/$nodeId/$'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/auth/status'
     | '/api/health/summary'
     | '/api/nodes/$id'
+    | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
     | '/api/dp/$nodeId/$'
@@ -344,6 +356,13 @@ declare module '@tanstack/react-router' {
       path: '/$id'
       fullPath: '/api/nodes/$id'
       preLoaderRoute: typeof ApiNodesIdRouteImport
+      parentRoute: typeof ApiNodesRoute
+    }
+    '/api/nodes/diff': {
+      id: '/api/nodes/diff'
+      path: '/diff'
+      fullPath: '/api/nodes/diff'
+      preLoaderRoute: typeof ApiNodesDiffRouteImport
       parentRoute: typeof ApiNodesRoute
     }
     '/api/nodes/export': {
@@ -460,12 +479,14 @@ const ApiNodesIdRouteWithChildren = ApiNodesIdRoute._addFileChildren(
 
 interface ApiNodesRouteChildren {
   ApiNodesIdRoute: typeof ApiNodesIdRouteWithChildren
+  ApiNodesDiffRoute: typeof ApiNodesDiffRoute
   ApiNodesExportRoute: typeof ApiNodesExportRoute
   ApiNodesImportRoute: typeof ApiNodesImportRoute
 }
 
 const ApiNodesRouteChildren: ApiNodesRouteChildren = {
   ApiNodesIdRoute: ApiNodesIdRouteWithChildren,
+  ApiNodesDiffRoute: ApiNodesDiffRoute,
   ApiNodesExportRoute: ApiNodesExportRoute,
   ApiNodesImportRoute: ApiNodesImportRoute,
 }
@@ -490,11 +511,10 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
+import type { createStart } from '@tanstack/react-start'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

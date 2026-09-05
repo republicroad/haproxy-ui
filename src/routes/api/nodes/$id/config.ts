@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { getNode, insertChange } from "#/lib/db"
 import { proxyToNode } from "#/lib/dataplane/proxy"
-import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
+import { exportNodeConfig } from "#/lib/configExport"
 
 async function dpJson<T>(
   nodeId: string,
@@ -44,48 +44,14 @@ export const Route = createFileRoute("/api/nodes/$id/config")({
         if (!node) {
           return Response.json({ error: "node not found" }, { status: 404 })
         }
-        const fes = unwrap<AnyConfig[]>(
-          (
-            await dpJson<AnyConfig[]>(
-              params.id,
-              "GET",
-              "services/haproxy/configuration/frontends",
-            )
-          ).json,
-        )
-        const bes = unwrap<AnyConfig[]>(
-          (
-            await dpJson<AnyConfig[]>(
-              params.id,
-              "GET",
-              "services/haproxy/configuration/backends",
-            )
-          ).json,
-        )
-        if (!fes || !bes) {
+        const result = await exportNodeConfig(params.id)
+        if (!result.ok) {
           return Response.json(
-            { error: "cannot reach dataplaneapi" },
-            { status: 502 },
+            { error: result.error },
+            { status: result.error === "node not found" ? 404 : 502 },
           )
         }
-        const [nFes, nBes] = [
-          normalizeFrontends(fes as never),
-          normalizeBackends(bes as never),
-        ]
-        const bundle = {
-          exportedAt: new Date().toISOString(),
-          sourceNode: { name: node.name, apiUrl: node.apiUrl },
-          frontends: nFes.filter((f) => !f.name.startsWith("_")),
-          backends: nBes
-            .filter((b) => !b.name.startsWith("_"))
-            .map((b) => ({
-              ...b,
-              servers: (Array.isArray(b.servers) ? b.servers : []).filter(
-                (s) => !String(s.name).startsWith("_"),
-              ),
-            })),
-        }
-        return Response.json(bundle, {
+        return Response.json(result.bundle, {
           headers: {
             "content-disposition": `attachment; filename="haproxy-config-${node.name}.json"`,
           },

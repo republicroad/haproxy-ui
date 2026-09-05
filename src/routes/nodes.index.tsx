@@ -6,6 +6,7 @@ import { NodesTable } from "#/components/NodesTable"
 import { NodeFormDialog } from "#/components/NodeFormDialog"
 import { ConfirmDialog } from "#/components/ConfirmDialog"
 import { NodesImportExportButtons } from "#/components/ImportExportButtons"
+import { CompareModal } from "#/components/CompareModal"
 import { Button } from "#/components/ui/button"
 import type { NodeRow } from "#/lib/types"
 
@@ -32,6 +33,7 @@ function NodesPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<NodeRow | null>(null)
   const [deleting, setDeleting] = useState<NodeRow | null>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: NODES_QUERY_KEY,
@@ -109,6 +111,13 @@ function NodesPage() {
           <NodesImportExportButtons onChanged={refresh} />
           <Button
             variant="outline"
+            onClick={() => setCompareOpen(true)}
+            disabled={nodes.length < 2}
+          >
+            Compare
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => testAllMut.mutate()}
             disabled={testAllMut.isPending || nodes.length === 0}
           >
@@ -149,6 +158,10 @@ function NodesPage() {
           refresh()
         }}
       />
+
+      {compareOpen && (
+        <CompareModal nodes={nodes} onClose={() => setCompareOpen(false)} />
+      )}
 
       <ConfirmDialog
         open={Boolean(deleting)}

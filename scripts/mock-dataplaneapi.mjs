@@ -261,6 +261,65 @@ const server = createServer((req, res) => {
       }
     }
 
+    // native stats (shape mirrors models.NativeStats)
+    if (p === "services/haproxy/stats/native" && method === "GET") {
+      const stats = []
+      let tick = 0
+      const jitter = () => Math.floor(Math.random() * 500) + tick++
+      for (const f of frontends) {
+        stats.push({
+          type: "frontend",
+          name: f.name,
+          backend_name: f.name,
+          stats: {
+            scur: jitter() % 20,
+            smax: 42,
+            stot: 1000 + jitter(),
+            req_rate: jitter() % 50,
+            bin: 4096 * (1 + jitter() % 10),
+            bout: 8192 * (1 + jitter() % 10),
+            hrsp_1xx: 1,
+            hrsp_2xx: 900 + jitter() % 50,
+            hrsp_4xx: jitter() % 10,
+            hrsp_5xx: jitter() % 3,
+            status: "OPEN",
+          },
+        })
+      }
+      for (const b of backends.values()) {
+        stats.push({
+          type: "backend",
+          name: b.name,
+          backend_name: b.name,
+          stats: {
+            stot: 800 + jitter(),
+            bin: 2048 * (1 + jitter() % 10),
+            bout: 4096 * (1 + jitter() % 10),
+            hrsp_2xx: 700 + jitter() % 40,
+            hrsp_5xx: jitter() % 5,
+            status: "UP",
+          },
+        })
+        for (const s of b.servers ?? []) {
+          const admin = s.admin_state ?? "ready"
+          stats.push({
+            type: "server",
+            name: s.name,
+            backend_name: b.name,
+            stats: {
+              stot: 400 + jitter(),
+              weight: s.weight ?? 100,
+              status: admin === "ready" ? "UP" : "MAINT",
+              req_rate: jitter() % 30,
+              bin: 1024 * (1 + jitter() % 5),
+              bout: 2048 * (1 + jitter() % 5),
+            },
+          })
+        }
+      }
+      return send(res, 200, { runtimeAPI: "/tmp/haproxy.sock", stats })
+    }
+
     return send(res, 404, { code: 404, message: `no mock for ${method} ${p}` })
   })
 })

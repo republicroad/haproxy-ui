@@ -45,10 +45,11 @@ import { SyncModal } from "#/components/SyncModal"
 import { GridSearchInput } from "#/components/GridSearchInput"
 import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
 import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
+import { TrafficTab } from "#/components/TrafficTab"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 import { diffLines } from "#/lib/diff"
 
-const TABS = ["overview", "frontends", "backends", "acls", "maps", "stats", "history", "raw"] as const
+const TABS = ["overview", "frontends", "backends", "traffic", "acls", "maps", "stats", "history", "raw"] as const
 type Tab = (typeof TABS)[number]
 
 async function fetchNode(id: string): Promise<NodeRow> {
@@ -180,6 +181,8 @@ function NodeDetail() {
       )}
 
       {tab === "maps" && <MapsTab nodeId={id} />}
+
+      {tab === "traffic" && <TrafficTab nodeId={id} />}
 
       {tab === "stats" && (
         <StatsTab nodeId={id} backends={beQ.data ?? []} loading={beQ.isLoading} />

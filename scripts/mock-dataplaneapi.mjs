@@ -106,7 +106,7 @@ const server = createServer((req, res) => {
       frontends.push(json)
       return send(res, 201, json)
     }
-    const feMatch = p.match(/^services\/haproxy\/configuration\/frontends\/(.+)$/)
+    const feMatch = p.match(/^services\/haproxy\/configuration\/frontends\/([^/]+)$/)
     if (feMatch && method === "GET") {
       const f = frontends.find((x) => x.name === decodeURIComponent(feMatch[1]))
       if (!f) return send(res, 404, { code: 404, message: "frontend not found" })
@@ -219,6 +219,26 @@ const server = createServer((req, res) => {
     }
 
     // config ACLs per parent section (frontend/backend)
+    const ruleMatch = p.match(
+      /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/http_request_rules\/?(\d+)?$/,
+    )
+    if (ruleMatch) {
+      const key = `rules|${ruleMatch[1]}|${decodeURIComponent(ruleMatch[2])}`
+      if (!acls.has(key)) acls.set(key, [])
+      const list = acls.get(key)
+      if (method === "GET" && ruleMatch[3] === undefined) {
+        return send(res, 200, list)
+      }
+      if (method === "POST") {
+        list.push(json)
+        return send(res, 201, json)
+      }
+      if (method === "DELETE" && ruleMatch[3] !== undefined) {
+        list.splice(Number(ruleMatch[3]), 1)
+        return send(res, 202, {})
+      }
+    }
+
     const aclMatch = p.match(
       /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/acls\/?(\d+)?$/,
     )
@@ -334,6 +354,8 @@ const server = createServer((req, res) => {
       }
       return send(res, 200, { runtimeAPI: "/tmp/haproxy.sock", stats })
     }
+
+    // config HTTP request rules per parent section (frontend/backend)
 
     // stick tables (read-only in mock)
     if (p === "services/haproxy/runtime/stick_tables" && method === "GET") {

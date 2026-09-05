@@ -76,7 +76,7 @@ export const backendInputSchema = z.object({
 
 export const changeMetaSchema = z.object({
   kind: z.enum(["create", "delete", "update"]),
-  resource: z.enum(["frontend", "backend", "server", "acl", "map"]),
+  resource: z.enum(["frontend", "backend", "server", "acl", "map", "rule"]),
   target: z.string().trim().min(1),
   parent: z.string().trim().optional(),
   payload: z.unknown().optional(),

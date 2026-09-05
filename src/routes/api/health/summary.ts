@@ -1,14 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router"
 import {
+  getAlertSettings,
+  getAlertState,
   insertHealthCheck,
   lastHealthCheckTs,
   listHealthChecks,
   listLatestHealthChecks,
   listNodes,
+  setAlertState,
   trimHealthChecks,
   updateNode,
 } from "#/lib/db"
 import { proxyToNode } from "#/lib/dataplane/proxy"
+
+const ALERT_COOLDOWN_MS = 5 * 60_000
+
+type AlertPayload = {
+  event: "node_down" | "node_recovered"
+  node: { id: string; name: string }
+  status: "up" | "down"
+  error?: string | null
+  ts: number
+}
+
+async function fireAlert(payload: AlertPayload): Promise<void> {
+  const { webhookUrl, enabled } = getAlertSettings()
+  if (!enabled || !webhookUrl) return
+  const state = getAlertState(payload.node.id)
+  const isDown = payload.event === "node_down"
+  // only alert on transitions
+  if (state.lastOk !== null && state.lastOk === !isDown) return
+  if (Date.now() - state.lastAlertTs < ALERT_COOLDOWN_MS) return
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...payload, text: `HAProxy UI: ${payload.node.name} is ${payload.status}` }),
+      signal: AbortSignal.timeout(5000),
+    })
+    setAlertState(payload.node.id, !isDown, Date.now())
+  } catch {
+    // webhook failures must not break the health summary
+  }
+}
 
 const MIN_INTERVAL_MS = 20_000
 const HISTORY_POINTS = 40
@@ -123,6 +157,27 @@ export const Route = createFileRoute("/api/health/summary")({
             latencyMs: probe.latencyMs,
             error: probe.error,
           })
+          // state-transition alerting (up->down and recovery), webhook-gated
+          const prev = getAlertState(n.id)
+          if (prev.lastOk === true && !probe.ok) {
+            await fireAlert({
+              event: "node_down",
+              node: { id: n.id, name: n.name },
+              status: "down",
+              error: probe.error,
+              ts,
+            })
+          } else if (prev.lastOk === false && probe.ok) {
+            await fireAlert({
+              event: "node_recovered",
+              node: { id: n.id, name: n.name },
+              status: "up",
+              error: null,
+              ts,
+            })
+          } else {
+            setAlertState(n.id, probe.ok)
+          }
         }
 
         const upIds = nodes.filter((n) => latest.get(n.id)?.ok).map((n) => n.id)

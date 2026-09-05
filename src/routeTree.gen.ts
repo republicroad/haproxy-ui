@@ -15,6 +15,8 @@ import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
 import { Route as NodesIndexRouteImport } from './routes/nodes.index'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
+import { Route as ApiAlertsSettingsRouteImport } from './routes/api/alerts/settings'
+import { Route as ApiAlertsTestRouteImport } from './routes/api/alerts/test'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthStatusRouteImport } from './routes/api/auth/status'
@@ -59,6 +61,16 @@ const NodesIdRoute = NodesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => NodesRoute,
+} as any)
+const ApiAlertsSettingsRoute = ApiAlertsSettingsRouteImport.update({
+  id: '/api/alerts/settings',
+  path: '/api/alerts/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsTestRoute = ApiAlertsTestRouteImport.update({
+  id: '/api/alerts/test',
+  path: '/api/alerts/test',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
   id: '/api/auth/login',
@@ -140,6 +152,8 @@ export interface FileRoutesByFullPath {
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
+  '/api/alerts/settings': typeof ApiAlertsSettingsRoute
+  '/api/alerts/test': typeof ApiAlertsTestRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
@@ -161,6 +175,8 @@ export interface FileRoutesByTo {
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes': typeof NodesIndexRoute
+  '/api/alerts/settings': typeof ApiAlertsSettingsRoute
+  '/api/alerts/test': typeof ApiAlertsTestRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
@@ -184,6 +200,8 @@ export interface FileRoutesById {
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
+  '/api/alerts/settings': typeof ApiAlertsSettingsRoute
+  '/api/alerts/test': typeof ApiAlertsTestRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
@@ -208,6 +226,8 @@ export interface FileRouteTypes {
     | '/api/nodes'
     | '/nodes/$id'
     | '/nodes/'
+    | '/api/alerts/settings'
+    | '/api/alerts/test'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
@@ -229,6 +249,8 @@ export interface FileRouteTypes {
     | '/api/nodes'
     | '/nodes/$id'
     | '/nodes'
+    | '/api/alerts/settings'
+    | '/api/alerts/test'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
@@ -251,6 +273,8 @@ export interface FileRouteTypes {
     | '/api/nodes'
     | '/nodes/$id'
     | '/nodes/'
+    | '/api/alerts/settings'
+    | '/api/alerts/test'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
@@ -272,6 +296,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NodesRoute: typeof NodesRouteWithChildren
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
+  ApiAlertsSettingsRoute: typeof ApiAlertsSettingsRoute
+  ApiAlertsTestRoute: typeof ApiAlertsTestRoute
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthStatusRoute: typeof ApiAuthStatusRoute
@@ -322,6 +348,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/nodes/$id'
       preLoaderRoute: typeof NodesIdRouteImport
       parentRoute: typeof NodesRoute
+    }
+    '/api/alerts/settings': {
+      id: '/api/alerts/settings'
+      path: '/api/alerts/settings'
+      fullPath: '/api/alerts/settings'
+      preLoaderRoute: typeof ApiAlertsSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/test': {
+      id: '/api/alerts/test'
+      path: '/api/alerts/test'
+      fullPath: '/api/alerts/test'
+      preLoaderRoute: typeof ApiAlertsTestRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/auth/login': {
       id: '/api/auth/login'
@@ -500,6 +540,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NodesRoute: NodesRouteWithChildren,
   ApiNodesRoute: ApiNodesRouteWithChildren,
+  ApiAlertsSettingsRoute: ApiAlertsSettingsRoute,
+  ApiAlertsTestRoute: ApiAlertsTestRoute,
   ApiAuthLoginRoute: ApiAuthLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthStatusRoute: ApiAuthStatusRoute,
@@ -511,10 +553,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

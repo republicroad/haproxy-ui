@@ -1,9 +1,14 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { AlertTriangle, RefreshCw } from "lucide-react"
+import { AlertTriangle, Bell, RefreshCw } from "lucide-react"
 import { Badge } from "#/components/reui/badge"
 import { Button } from "#/components/ui/button"
+import { Input } from "#/components/ui/input"
+import { Label } from "#/components/ui/label"
+import { Checkbox } from "#/components/ui/checkbox"
+import { Modal } from "./Modal"
 
 type HealthPoint = {
   ts: number
@@ -60,7 +65,108 @@ function LatencyBars({ history }: { history: HealthPoint[] }) {
   )
 }
 
+function AlertSettingsModal({ onClose }: { onClose: () => void }) {
+  const [url, setUrl] = useState("")
+  const [enabled, setEnabled] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/alerts/settings")
+      .then((r) => (r.ok ? r.json() : { webhookUrl: "", enabled: false }))
+      .then((j: { webhookUrl: string; enabled: boolean }) => {
+        setUrl(j.webhookUrl)
+        setEnabled(j.enabled)
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(true))
+  }, [])
+
+  const save = async (testOnly?: boolean) => {
+    setPending(true)
+    setMsg(null)
+    try {
+      if (testOnly) {
+        const res = await fetch("/api/alerts/test", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ webhookUrl: url }),
+        })
+        const j = await res.json().catch(() => ({}))
+        setMsg(
+          j.ok ? "Test payload sent." : `Test failed: ${j.error ?? res.status}`,
+        )
+      } else {
+        const res = await fetch("/api/alerts/settings", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ webhookUrl: url, enabled }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error ?? "save failed")
+        setMsg("Settings saved.")
+      }
+    } catch (e) {
+      setMsg((e as Error).message)
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Alert notifications">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          A webhook is POSTed when a node transitions down or recovers
+          (5-minute cooldown). Works with Slack/Discord/generic JSON hooks.
+        </p>
+        <div>
+          <Label className="mb-1 block text-xs text-muted-foreground">
+            Webhook URL
+          </Label>
+          <Input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://hooks.example.com/..."
+            aria-label="webhook url"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={enabled}
+            onCheckedChange={(v) => setEnabled(v === true)}
+          />
+          Enable alerts
+        </label>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pending || !loaded || !url}
+            onClick={() => save(true)}
+          >
+            Send test
+          </Button>
+          <Button
+            size="sm"
+            disabled={pending || !loaded || (enabled && !url)}
+            onClick={() => save()}
+          >
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export function FleetHealth() {
+  const [alertOpen, setAlertOpen] = useState(false)
   const q = useQuery({
     queryKey: ["health-summary"],
     queryFn: async (): Promise<HealthSummary> => {
@@ -95,12 +201,23 @@ export function FleetHealth() {
           {data?.totals.serversDown ? (
             <Badge variant="warning">{data.totals.serversDown} servers down</Badge>
           ) : null}
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => setAlertOpen(true)}
+            aria-label="alert settings"
+          >
+            <Bell className="h-3.5 w-3.5" />
+            Alerts
+          </Button>
           <Button size="xs" variant="outline" onClick={refresh} disabled={q.isFetching}>
             <RefreshCw className={"h-3 w-3 " + (q.isFetching ? "animate-spin" : "")} />
             Refresh
           </Button>
         </div>
       </div>
+
+      {alertOpen && <AlertSettingsModal onClose={() => setAlertOpen(false)} />}
 
       {q.isLoading && <p className="text-muted-foreground">Checking nodes…</p>}
 

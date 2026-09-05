@@ -57,6 +57,16 @@ db.exec(`
     error TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_health_node ON node_health_checks(node_id, ts);
+  CREATE TABLE IF NOT EXISTS alert_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    webhook_url TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS alert_state (
+    node_id TEXT PRIMARY KEY,
+    last_ok INTEGER,
+    last_alert_ts INTEGER NOT NULL DEFAULT 0
+  );
 `)
 
 /** Encrypt any legacy plaintext api_pass values when HAPROXY_UI_KEY is set. */
@@ -367,4 +377,44 @@ export function trimHealthChecks(keepCount = 720): void {
       ) WHERE rn > ${Math.max(1, keepCount)}
     )
   `)
+}
+
+export type AlertSettings = { webhookUrl: string; enabled: boolean }
+
+export function getAlertSettings(): AlertSettings {
+  db.exec(
+    "INSERT OR IGNORE INTO alert_settings (id, webhook_url, enabled) VALUES (1, '', 0)",
+  )
+  const row = db
+    .prepare("SELECT webhook_url, enabled FROM alert_settings WHERE id = 1")
+    .get() as { webhook_url: string; enabled: number }
+  return { webhookUrl: row.webhook_url, enabled: row.enabled === 1 }
+}
+
+export function setAlertSettings(s: { webhookUrl: string; enabled: boolean }): void {
+  db.exec(
+    "INSERT OR IGNORE INTO alert_settings (id, webhook_url, enabled) VALUES (1, '', 0)",
+  )
+  db.prepare("UPDATE alert_settings SET webhook_url = ?, enabled = ? WHERE id = 1").run(
+    s.webhookUrl,
+    s.enabled ? 1 : 0,
+  )
+}
+
+export function getAlertState(nodeId: string): { lastOk: boolean | null; lastAlertTs: number } {
+  const row = db
+    .prepare("SELECT last_ok, last_alert_ts FROM alert_state WHERE node_id = ?")
+    .get(nodeId) as { last_ok: number | null; last_alert_ts: number } | undefined
+  return {
+    lastOk: row?.last_ok == null ? null : row.last_ok === 1,
+    lastAlertTs: row?.last_alert_ts ?? 0,
+  }
+}
+
+export function setAlertState(nodeId: string, lastOk: boolean, lastAlertTs?: number): void {
+  db.prepare(
+    `INSERT INTO alert_state (node_id, last_ok, last_alert_ts) VALUES (?, ?, ?)
+     ON CONFLICT(node_id) DO UPDATE SET last_ok = excluded.last_ok,
+     last_alert_ts = COALESCE(?, alert_state.last_alert_ts)`,
+  ).run(nodeId, lastOk ? 1 : 0, lastAlertTs ?? 0, lastAlertTs ?? null)
 }

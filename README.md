@@ -27,8 +27,16 @@ Query/Table, `node:sqlite`, and zod.
   applied through transactions and recorded in history.
 - **Runtime maps** — inspect and edit stick-table-driven map files
   (key/value CRUD, applies live without reload).
+- **Auth userlists & DNS resolvers** — manage HAProxy Basic-Auth
+  userlists (lists + users) and DNS resolvers (nameservers, hold
+  tuning) for FQDN server pools.
+- **Service topology** — read-only SVG map of frontends → backends →
+  servers, colored by runtime health state.
 - **Stick tables** — read-only viewer with pagination for runtime stick
   table entries.
+- **Automation API** — admin-minted bearer tokens (hash-only storage,
+  instant revocation) let CI/curl scripts call the same REST API the
+  UI uses.
 - **Change history** — every configuration change is recorded with a raw
   config snapshot and the acting user; LCS-based diffs and one-click
   revert (create ⇄ delete) via a validated transaction.
@@ -53,6 +61,9 @@ Query/Table, `node:sqlite`, and zod.
   AES-256-GCM encrypted credential storage at rest, and multi-user
   accounts with `admin`/`viewer` roles (viewer is read-only, last-admin
   protection, user management UI).
+- **Automation API** — admin-minted bearer tokens (hash-only storage,
+  copy-once, instant revocation) let CI/curl scripts call the same
+  REST API the UI uses.
 - **Live updates** — server-sent events push config changes, node status
   flips and user changes to the UI; polling remains as a fallback.
 - **Retention & backups** — hourly maintenance loop purges change

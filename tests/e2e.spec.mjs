@@ -154,11 +154,15 @@ test.describe.serial("haproxy-ui e2e", () => {
   test("users page: create and delete a user", async ({ page }) => {
     await page.goto("/users")
     await expect(page.getByRole("heading", { name: "Users" })).toBeVisible()
+    await page.waitForLoadState("networkidle")
     const username = `u${Date.now().toString(36)}`
     await page.getByLabel("username").fill(username)
     await page.getByLabel("password").fill("secret123")
-    await page.getByRole("button", { name: "Create user" }).click()
-    await expect(page.getByText(`User "${username}" created`)).toBeVisible({ timeout: 15_000 })
+    await clickUntil(
+      page,
+      page.getByRole("button", { name: "Create user" }),
+      (opts) => expect(page.getByText(`User "${username}" created`)).toBeVisible(opts),
+    )
     await expect(page.getByText(username).first()).toBeVisible()
     // delete it (the row's Delete button in that user's row)
     const row = page.getByRole("row", { name: new RegExp(username) })

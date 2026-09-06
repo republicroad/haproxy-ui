@@ -1,3 +1,5 @@
+# [![v1.0.0](https://img.shields.io/badge/version-1.0.0-blue)](CHANGELOG.md)
+
 # HAProxy UI
 
 A self-hosted management UI for HAProxy fleets, built on the official
@@ -159,7 +161,6 @@ Browser ─┬─ /api/nodes (CRUD, test, export/import, diff) ──> TanStack 
 
 ## Roadmap
 
-- SSL/TLS certificate management (dataplaneapi storage API)
-- Health-check parameter editing (interval / fall / rise)
-- Historical metric sampling with trend charts
-- Node groups/tags with group-scoped sync and drift checks
+- Access-log ingestion and request explorer (cost/benefit under evaluation)
+- OIDC/SSO integration for enterprise identity providers
+- HAProxy binary upgrade orchestration

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { authEnabled, sessionFromRequest } from "#/lib/auth"
+import { authEnabled, identityFromRequest } from "#/lib/auth"
 import { bus, type AppEvent } from "#/lib/events"
 
 /**
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/events")({
     handlers: {
       GET: async ({ request }) => {
         // auth gate (SSE is a GET; RBAC allows all roles to read)
-        if (authEnabled() && !sessionFromRequest(request)) {
+        if (authEnabled() && !identityFromRequest(request)) {
           return Response.json({ error: "unauthorized" }, { status: 401 })
         }
 

@@ -49,6 +49,7 @@ import { TrafficTab } from "#/components/TrafficTab"
 import { StickTablesTab } from "#/components/StickTablesTab"
 import { CertificatesTab } from "#/components/CertificatesTab"
 import { UserlistsTab } from "#/components/UserlistsTab"
+import { TopologyView } from "#/components/TopologyView"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 import { POLL } from "#/lib/poll"
 import { diffLines } from "#/lib/diff"
@@ -152,7 +153,10 @@ function NodeDetail() {
       {error && <Alert variant="default">{error}</Alert>}
 
       {tab === "overview" && (
-        <OverviewTab info={infoQ.data} loading={infoQ.isLoading} error={infoQ.error} />
+        <div className="space-y-4">
+          <OverviewTab info={infoQ.data} loading={infoQ.isLoading} error={infoQ.error} />
+          <TopologyView nodeId={id} />
+        </div>
       )}
 
       {tab === "frontends" && (

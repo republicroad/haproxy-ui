@@ -1,5 +1,11 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
-import { getUser, listUsers } from "#/lib/db"
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
+import {
+  getApiTokenByHash,
+  getUser,
+  insertApiToken,
+  listUsers,
+  touchApiToken,
+} from "#/lib/db"
 
 export const SESSION_COOKIE = "hui_session"
 const SESSION_TTL_MS = 7 * 86_400_000
@@ -130,16 +136,60 @@ export function sessionFromRequest(request: Request): SessionInfo | null {
   return verifySessionToken(readSessionCookie(request))
 }
 
-/** Audit actor: the signed-in username when auth is on, else null. */
+// --- API tokens (Bearer) ---
+
+export type NewApiToken = { id: string; token: string; name: string; role: Role }
+
+/** Generate a new API token; only the SHA-256 hash is stored. */
+export function mintApiToken(name: string, role: Role): NewApiToken {
+  const token = `hui_${randomBytes(24).toString("hex")}`
+  const tokenHash = createHash("sha256").update(token).digest("hex")
+  const record = {
+    id: crypto.randomUUID(),
+    name,
+    tokenHash,
+    role,
+    createdAt: Date.now(),
+  }
+  insertApiToken(record)
+  return { id: record.id, token, name, role }
+}
+
+export function hashApiToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex")
+}
+
+function bearerFromRequest(request: Request): string | null {
+  const header = request.headers.get("authorization")
+  if (!header?.startsWith("Bearer ")) return null
+  return header.slice(7).trim() || null
+}
+
+/**
+ * Resolve the caller identity: session cookie first, then API token
+ * (Authorization: Bearer). Returns username-like label + role.
+ */
+export function identityFromRequest(request: Request): SessionInfo | null {
+  const session = sessionFromRequest(request)
+  if (session) return session
+  const bearer = bearerFromRequest(request)
+  if (!bearer) return null
+  const record = getApiTokenByHash(hashApiToken(bearer))
+  if (!record) return null
+  touchApiToken(record.id)
+  return { username: `token:${record.name}`, role: record.role }
+}
+
+/** Audit actor: signed-in username or token name when auth is on, else null. */
 export function actorFromRequest(request: Request): string | null {
   if (!authEnabled()) return null
-  return sessionFromRequest(request)?.username ?? null
+  return identityFromRequest(request)?.username ?? null
 }
 
 /** Role of the caller; "admin" when auth is off (local single-user mode). */
 export function roleFromRequest(request: Request): Role | null {
   if (!authEnabled()) return "admin"
-  return sessionFromRequest(request)?.role ?? null
+  return identityFromRequest(request)?.role ?? null
 }
 
 // --- hardening ---

@@ -1,10 +1,9 @@
 import { createMiddleware } from "@tanstack/react-start"
 import {
   authEnabled,
+  identityFromRequest,
   isCrossSiteWrite,
-  readSessionCookie,
   roleFromRequest,
-  verifySessionToken,
 } from "#/lib/auth"
 
 /**
@@ -30,7 +29,7 @@ export const authMiddleware = createMiddleware().server(async ({ request, next }
       path === "/api/auth/status"
     if (isPublic) return next()
 
-    if (verifySessionToken(readSessionCookie(request))) {
+    if (identityFromRequest(request)) {
       const method = request.method.toUpperCase()
       const write = method !== "GET" && method !== "HEAD" && method !== "OPTIONS"
       if (write && roleFromRequest(request) !== "admin") {

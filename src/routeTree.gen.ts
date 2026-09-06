@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NodesRouteImport } from './routes/nodes'
+import { Route as TokensRouteImport } from './routes/tokens'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
+import { Route as ApiTokensRouteImport } from './routes/api/tokens'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as NodesIndexRouteImport } from './routes/nodes.index'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
@@ -28,6 +30,7 @@ import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
 import { Route as ApiNodesDiffRouteImport } from './routes/api/nodes.diff'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
+import { Route as ApiTokensIdRouteImport } from './routes/api/tokens/$id'
 import { Route as ApiUsersUsernameRouteImport } from './routes/api/users/$username'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
 import { Route as ApiNodesIdCertsRouteImport } from './routes/api/nodes/$id/certs'
@@ -53,6 +56,11 @@ const NodesRoute = NodesRouteImport.update({
   path: '/nodes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TokensRoute = TokensRouteImport.update({
+  id: '/tokens',
+  path: '/tokens',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -66,6 +74,11 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
 const ApiNodesRoute = ApiNodesRouteImport.update({
   id: '/api/nodes',
   path: '/api/nodes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTokensRoute = ApiTokensRouteImport.update({
+  id: '/api/tokens',
+  path: '/api/tokens',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUsersRoute = ApiUsersRouteImport.update({
@@ -133,6 +146,11 @@ const ApiNodesImportRoute = ApiNodesImportRouteImport.update({
   path: '/import',
   getParentRoute: () => ApiNodesRoute,
 } as any)
+const ApiTokensIdRoute = ApiTokensIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiTokensRoute,
+} as any)
 const ApiUsersUsernameRoute = ApiUsersUsernameRouteImport.update({
   id: '/$username',
   path: '/$username',
@@ -185,9 +203,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
+  '/tokens': typeof TokensRoute
   '/users': typeof UsersRoute
   '/api/events': typeof ApiEventsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
+  '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
@@ -201,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
@@ -214,9 +235,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/tokens': typeof TokensRoute
   '/users': typeof UsersRoute
   '/api/events': typeof ApiEventsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
+  '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes': typeof NodesIndexRoute
@@ -230,6 +253,7 @@ export interface FileRoutesByTo {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
@@ -245,9 +269,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/nodes': typeof NodesRouteWithChildren
+  '/tokens': typeof TokensRoute
   '/users': typeof UsersRoute
   '/api/events': typeof ApiEventsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
+  '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
@@ -261,6 +287,7 @@ export interface FileRoutesById {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
@@ -277,9 +304,11 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/nodes'
+    | '/tokens'
     | '/users'
     | '/api/events'
     | '/api/nodes'
+    | '/api/tokens'
     | '/api/users'
     | '/nodes/$id'
     | '/nodes/'
@@ -293,6 +322,7 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/tokens/$id'
     | '/api/users/$username'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/certs'
@@ -306,9 +336,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/tokens'
     | '/users'
     | '/api/events'
     | '/api/nodes'
+    | '/api/tokens'
     | '/api/users'
     | '/nodes/$id'
     | '/nodes'
@@ -322,6 +354,7 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/tokens/$id'
     | '/api/users/$username'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/certs'
@@ -336,9 +369,11 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/nodes'
+    | '/tokens'
     | '/users'
     | '/api/events'
     | '/api/nodes'
+    | '/api/tokens'
     | '/api/users'
     | '/nodes/$id'
     | '/nodes/'
@@ -352,6 +387,7 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/tokens/$id'
     | '/api/users/$username'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/certs'
@@ -367,9 +403,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   NodesRoute: typeof NodesRouteWithChildren
+  TokensRoute: typeof TokensRoute
   UsersRoute: typeof UsersRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
+  ApiTokensRoute: typeof ApiTokensRouteWithChildren
   ApiUsersRoute: typeof ApiUsersRouteWithChildren
   ApiAlertsSettingsRoute: typeof ApiAlertsSettingsRoute
   ApiAlertsTestRoute: typeof ApiAlertsTestRoute
@@ -403,6 +441,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NodesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tokens': {
+      id: '/tokens'
+      path: '/tokens'
+      fullPath: '/tokens'
+      preLoaderRoute: typeof TokensRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/users': {
       id: '/users'
       path: '/users'
@@ -422,6 +467,13 @@ declare module '@tanstack/react-router' {
       path: '/api/nodes'
       fullPath: '/api/nodes'
       preLoaderRoute: typeof ApiNodesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tokens': {
+      id: '/api/tokens'
+      path: '/api/tokens'
+      fullPath: '/api/tokens'
+      preLoaderRoute: typeof ApiTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/users': {
@@ -514,6 +566,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/nodes/import'
       preLoaderRoute: typeof ApiNodesImportRouteImport
       parentRoute: typeof ApiNodesRoute
+    }
+    '/api/tokens/$id': {
+      id: '/api/tokens/$id'
+      path: '/$id'
+      fullPath: '/api/tokens/$id'
+      preLoaderRoute: typeof ApiTokensIdRouteImport
+      parentRoute: typeof ApiTokensRoute
     }
     '/api/users/$username': {
       id: '/api/users/$username'
@@ -656,6 +715,18 @@ const ApiNodesRouteWithChildren = ApiNodesRoute._addFileChildren(
   ApiNodesRouteChildren,
 )
 
+interface ApiTokensRouteChildren {
+  ApiTokensIdRoute: typeof ApiTokensIdRoute
+}
+
+const ApiTokensRouteChildren: ApiTokensRouteChildren = {
+  ApiTokensIdRoute: ApiTokensIdRoute,
+}
+
+const ApiTokensRouteWithChildren = ApiTokensRoute._addFileChildren(
+  ApiTokensRouteChildren,
+)
+
 interface ApiUsersRouteChildren {
   ApiUsersUsernameRoute: typeof ApiUsersUsernameRoute
 }
@@ -672,9 +743,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   NodesRoute: NodesRouteWithChildren,
+  TokensRoute: TokensRoute,
   UsersRoute: UsersRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiNodesRoute: ApiNodesRouteWithChildren,
+  ApiTokensRoute: ApiTokensRouteWithChildren,
   ApiUsersRoute: ApiUsersRouteWithChildren,
   ApiAlertsSettingsRoute: ApiAlertsSettingsRoute,
   ApiAlertsTestRoute: ApiAlertsTestRoute,

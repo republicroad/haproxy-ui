@@ -7,6 +7,7 @@ import {
   Boxes,
   LogOut,
   Users as UsersIcon,
+  KeyRound,
 } from "lucide-react"
 
 function LogoutButton() {
@@ -48,7 +49,10 @@ export function Sidebar() {
     { to: "/" as const, label: "Overview", icon: LayoutDashboard },
     { to: "/nodes" as const, label: "Nodes", icon: Boxes },
     ...(authEnabled && role === "admin"
-      ? [{ to: "/users" as const, label: "Users", icon: UsersIcon }]
+      ? [
+          { to: "/users" as const, label: "Users", icon: UsersIcon },
+          { to: "/tokens" as const, label: "API tokens", icon: KeyRound },
+        ]
       : []),
   ]
 

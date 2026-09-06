@@ -76,6 +76,14 @@ db.exec(`
     role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'viewer')),
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'viewer')),
+    created_at INTEGER NOT NULL,
+    last_used INTEGER
+  );
   CREATE TABLE IF NOT EXISTS metric_samples (
     id TEXT PRIMARY KEY,
     node_id TEXT NOT NULL,
@@ -538,6 +546,61 @@ export function updateUser(
 
 export function deleteUser(username: string): void {
   db.prepare("DELETE FROM users WHERE username = ?").run(username)
+}
+
+export type ApiTokenRow = {
+  id: string
+  name: string
+  tokenHash: string
+  role: "admin" | "viewer"
+  createdAt: number
+  lastUsed: number | null
+}
+
+export function listApiTokens(): Omit<ApiTokenRow, "tokenHash">[] {
+  return (
+    db
+      .prepare(
+        "SELECT id, name, role, created_at, last_used FROM api_tokens ORDER BY created_at DESC",
+      )
+      .all() as { id: string; name: string; role: string; created_at: number; last_used: number | null }[]
+  ).map((r) => ({
+    id: r.id,
+    name: r.name,
+    role: r.role as "admin" | "viewer",
+    createdAt: r.created_at,
+    lastUsed: r.last_used,
+  }))
+}
+
+export function getApiTokenByHash(tokenHash: string): Omit<ApiTokenRow, "tokenHash"> | undefined {
+  const row = db
+    .prepare("SELECT id, name, role, created_at, last_used FROM api_tokens WHERE token_hash = ?")
+    .get(tokenHash) as
+    | { id: string; name: string; role: string; created_at: number; last_used: number | null }
+    | undefined
+  if (!row) return undefined
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role as "admin" | "viewer",
+    createdAt: row.created_at,
+    lastUsed: row.last_used,
+  }
+}
+
+export function insertApiToken(t: Omit<ApiTokenRow, "lastUsed">): void {
+  db.prepare(
+    "INSERT INTO api_tokens (id, name, token_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
+  ).run(t.id, t.name, t.tokenHash, t.role, t.createdAt)
+}
+
+export function deleteApiToken(id: string): void {
+  db.prepare("DELETE FROM api_tokens WHERE id = ?").run(id)
+}
+
+export function touchApiToken(id: string): void {
+  db.prepare("UPDATE api_tokens SET last_used = ? WHERE id = ?").run(Date.now(), id)
 }
 
 export function countAdmins(): number {

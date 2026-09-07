@@ -63,10 +63,10 @@ test.describe.serial("haproxy-ui e2e", () => {
     nodeId = await link.getAttribute("href").then((h) => h?.split("/").pop())
   })
 
-  test("node detail renders all ten tabs", async ({ page }) => {
+  test("node detail renders all tabs", async ({ page }) => {
     test.skip(!nodeId, "node not created")
     await page.goto(`/nodes/${nodeId}`)
-    for (const tab of ["overview", "frontends", "backends", "traffic", "acls", "maps", "stats", "stick", "history", "raw"]) {
+    for (const tab of ["overview", "frontends", "backends", "traffic", "acls", "rules", "waf", "logs", "stats", "stick", "history", "raw"]) {
       await expect(page.getByText(tab, { exact: true })).toBeVisible()
     }
     await expect(page.getByRole("button", { name: "Sync to nodes" })).toBeVisible()
@@ -126,7 +126,7 @@ test.describe.serial("haproxy-ui e2e", () => {
     await expect(page.getByText("Backends", { exact: true })).toBeVisible()
   })
 
-  test("ACLs tab: create and delete a redirect rule", async ({ page }) => {
+  test("Rules tab: create and delete a redirect rule, switching rule and rate limit", async ({ page }) => {
     test.skip(!nodeId, "node not created")
     await page.goto(`/nodes/${nodeId}`)
     // rules need a parent section; recreate the frontend if previous
@@ -140,15 +140,98 @@ test.describe.serial("haproxy-ui e2e", () => {
       await page.getByRole("button", { name: "Create" }).click()
       await expect(page.getByText('Frontend "fe_e2e" created')).toBeVisible({ timeout: 15_000 })
     }
-    await goTab(page, "acls")
+    // a backend is needed for switching rules / rate limit
+    await goTab(page, "backends")
+    const hasBe = await page.getByRole("cell", { name: "be_e2e" }).first().isVisible().catch(() => false)
+    if (!hasBe) {
+      await page.getByRole("button", { name: "New backend" }).click()
+      await page.getByPlaceholder("name").fill("be_e2e")
+      await page.getByRole("button", { name: "Create" }).click()
+      await expect(page.getByText('Backend "be_e2e" created')).toBeVisible({ timeout: 15_000 })
+    }
+
+    await goTab(page, "rules")
+    // HTTP request rules section is rendered for the first frontend
+    await expect(page.getByText("HTTP request rules").first()).toBeVisible()
     await page.getByPlaceholder("code (301/302/307/308)").fill("302")
     await page.getByPlaceholder("destination (e.g. /new)").fill("/moved")
-    await page.getByRole("button", { name: "Add rule" }).click()
-    await expect(page.getByText("Request rule added")).toBeVisible({ timeout: 15_000 })
+    await page.getByRole("button", { name: "Add rule" }).first().click()
+    await expect(page.getByText("Rule added").first()).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText("302 → /moved").first()).toBeVisible()
     // remove it again to keep state clean
-    await page.getByRole("button", { name: "Delete" }).last().click()
-    await expect(page.getByText("Request rule removed")).toBeVisible({ timeout: 15_000 })
+    await page.getByRole("button", { name: "Delete" }).nth(0).click()
+    await expect(page.getByText("Rule removed").first()).toBeVisible({ timeout: 15_000 })
+
+    // switching rule on the frontend targeting be_e2e
+    await page.getByLabel("rules section type").click()
+    await page.getByRole("option", { name: "Frontend" }).click()
+    await page.getByLabel("target backend").click()
+    await page.getByRole("option", { name: "be_e2e" }).click()
+    await page.getByPlaceholder("condition (e.g. { path_beg /api })").fill("{ path_beg /api }")
+    await page.getByRole("button", { name: "Add rule" }).last().click()
+    await expect(page.getByText("Rule added").last()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("{ path_beg /api }").first()).toBeVisible()
+  })
+
+  test("Rules tab: backend health check and rate-limit preset", async ({ page }) => {
+    test.skip(!nodeId, "node not created")
+    await page.goto(`/nodes/${nodeId}`)
+    await goTab(page, "rules")
+    await page.getByLabel("rules section type").click()
+    await page.getByRole("option", { name: "Backend" }).click()
+    await expect(page.getByText("Active health check expectations")).toBeVisible()
+
+    await page.getByLabel("check type").click()
+    await page.getByRole("option", { name: "status" }).click()
+    await page.getByLabel("check value").fill("200")
+    await page.getByRole("button", { name: "Add check" }).click()
+    await expect(page.getByText("Rule added").first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole("cell", { name: "200", exact: true }).last()).toBeVisible()
+
+    await page.getByLabel("max requests").fill("50")
+    await page.getByRole("button", { name: "Apply rate limit" }).click()
+    await expect(page.getByText(/Rate limit applied to/)).toBeVisible({ timeout: 15_000 })
+    // track-sc0 + deny rules are now in the request-rules table
+    await expect(page.getByText("track-sc0").first()).toBeVisible({ timeout: 15_000 })
+    await expect(
+      page.getByText(/http_req_rate\(10s\) gt 50/).first(),
+    ).toBeVisible({ timeout: 15_000 })
+  })
+
+  test("WAF tab: toggle SQL injection preset and bot blocking", async ({ page }) => {
+    test.skip(!nodeId, "node not created")
+    await page.goto(`/nodes/${nodeId}`)
+    // make sure the frontend exists (fresh mock per run keeps state)
+    await goTab(page, "frontends")
+    const hasFe = await page.getByRole("cell", { name: "fe_e2e" }).first().isVisible().catch(() => false)
+    if (!hasFe) {
+      await page.getByRole("button", { name: "New frontend" }).click()
+      await page.getByPlaceholder("name").fill("fe_e2e")
+      await page.getByPlaceholder("bind address").fill("*")
+      await page.getByRole("button", { name: "Create" }).click()
+      await expect(page.getByText('Frontend "fe_e2e" created')).toBeVisible({ timeout: 15_000 })
+    }
+
+    await goTab(page, "waf")
+    await expect(page.getByText("WAF protection")).toBeVisible()
+
+    // enable the SQL injection preset
+    const sqliRow = page.getByRole("row", { name: /SQL injection/ })
+    await sqliRow.getByRole("button", { name: "Enable" }).click()
+    await expect(page.getByText("SQL injection enabled")).toBeVisible({ timeout: 15_000 })
+    await expect(sqliRow.getByText("active", { exact: true })).toBeVisible()
+
+    // bot blocking seeds signatures and flips active
+    const botsRow = page.getByRole("row", { name: /Block bad bots/ })
+    await botsRow.getByRole("button", { name: "Enable" }).click()
+    await expect(page.getByText("Block bad bots enabled")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("sqlmap").first()).toBeVisible()
+
+    // disable both again to leave clean state
+    await sqliRow.getByRole("button", { name: "Disable" }).click()
+    await expect(page.getByText("SQL injection disabled")).toBeVisible({ timeout: 15_000 })
+    await botsRow.getByRole("button", { name: "Disable" }).click()
+    await expect(page.getByText("Block bad bots disabled")).toBeVisible({ timeout: 15_000 })
   })
 
   test("users page: create and delete a user", async ({ page }) => {

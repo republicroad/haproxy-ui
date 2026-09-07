@@ -15,6 +15,8 @@ import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as TokensRouteImport } from './routes/tokens'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiLogsRouteImport } from './routes/api/logs'
+import { Route as ApiMetricsRouteImport } from './routes/api/metrics'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
 import { Route as ApiTokensRouteImport } from './routes/api/tokens'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
@@ -30,14 +32,19 @@ import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
 import { Route as ApiNodesDiffRouteImport } from './routes/api/nodes.diff'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
+import { Route as ApiOpenapiJsonRouteImport } from './routes/api/openapi.json'
 import { Route as ApiTokensIdRouteImport } from './routes/api/tokens/$id'
 import { Route as ApiUsersUsernameRouteImport } from './routes/api/users/$username'
+import { Route as ApiAuthOidcCallbackRouteImport } from './routes/api/auth/oidc/callback'
+import { Route as ApiAuthOidcStartRouteImport } from './routes/api/auth/oidc/start'
+import { Route as ApiAuthOidcStatusRouteImport } from './routes/api/auth/oidc/status'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
 import { Route as ApiNodesIdCertsRouteImport } from './routes/api/nodes/$id/certs'
 import { Route as ApiNodesIdChangesRouteImport } from './routes/api/nodes/$id/changes'
 import { Route as ApiNodesIdConfigRouteImport } from './routes/api/nodes/$id/config'
 import { Route as ApiNodesIdMetricsRouteImport } from './routes/api/nodes/$id/metrics'
 import { Route as ApiNodesIdTestRouteImport } from './routes/api/nodes/$id/test'
+import { Route as ApiNodesIdUpgradeRouteImport } from './routes/api/nodes/$id/upgrade'
 import { Route as ApiNodesIdChangesChangeIdRouteImport } from './routes/api/nodes/$id/changes/$changeId'
 import { Route as ApiNodesIdChangesChangeIdRevertRouteImport } from './routes/api/nodes/$id/changes/$changeId/revert'
 
@@ -69,6 +76,16 @@ const UsersRoute = UsersRouteImport.update({
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLogsRoute = ApiLogsRouteImport.update({
+  id: '/api/logs',
+  path: '/api/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetricsRoute = ApiMetricsRouteImport.update({
+  id: '/api/metrics',
+  path: '/api/metrics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiNodesRoute = ApiNodesRouteImport.update({
@@ -146,6 +163,11 @@ const ApiNodesImportRoute = ApiNodesImportRouteImport.update({
   path: '/import',
   getParentRoute: () => ApiNodesRoute,
 } as any)
+const ApiOpenapiJsonRoute = ApiOpenapiJsonRouteImport.update({
+  id: '/api/openapi/json',
+  path: '/api/openapi/json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTokensIdRoute = ApiTokensIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -155,6 +177,21 @@ const ApiUsersUsernameRoute = ApiUsersUsernameRouteImport.update({
   id: '/$username',
   path: '/$username',
   getParentRoute: () => ApiUsersRoute,
+} as any)
+const ApiAuthOidcCallbackRoute = ApiAuthOidcCallbackRouteImport.update({
+  id: '/api/auth/oidc/callback',
+  path: '/api/auth/oidc/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthOidcStartRoute = ApiAuthOidcStartRouteImport.update({
+  id: '/api/auth/oidc/start',
+  path: '/api/auth/oidc/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthOidcStatusRoute = ApiAuthOidcStatusRouteImport.update({
+  id: '/api/auth/oidc/status',
+  path: '/api/auth/oidc/status',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDpNodeIdSplatRoute = ApiDpNodeIdSplatRouteImport.update({
   id: '/api/dp/$nodeId/$',
@@ -186,6 +223,11 @@ const ApiNodesIdTestRoute = ApiNodesIdTestRouteImport.update({
   path: '/test',
   getParentRoute: () => ApiNodesIdRoute,
 } as any)
+const ApiNodesIdUpgradeRoute = ApiNodesIdUpgradeRouteImport.update({
+  id: '/upgrade',
+  path: '/upgrade',
+  getParentRoute: () => ApiNodesIdRoute,
+} as any)
 const ApiNodesIdChangesChangeIdRoute =
   ApiNodesIdChangesChangeIdRouteImport.update({
     id: '/$changeId',
@@ -206,6 +248,8 @@ export interface FileRoutesByFullPath {
   '/tokens': typeof TokensRoute
   '/users': typeof UsersRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/logs': typeof ApiLogsRoute
+  '/api/metrics': typeof ApiMetricsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
@@ -221,14 +265,19 @@ export interface FileRoutesByFullPath {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/openapi/json': typeof ApiOpenapiJsonRoute
   '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
+  '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
+  '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
+  '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/metrics': typeof ApiNodesIdMetricsRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
+  '/api/nodes/$id/upgrade': typeof ApiNodesIdUpgradeRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
 }
@@ -238,6 +287,8 @@ export interface FileRoutesByTo {
   '/tokens': typeof TokensRoute
   '/users': typeof UsersRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/logs': typeof ApiLogsRoute
+  '/api/metrics': typeof ApiMetricsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
@@ -253,14 +304,19 @@ export interface FileRoutesByTo {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/openapi/json': typeof ApiOpenapiJsonRoute
   '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
+  '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
+  '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
+  '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/metrics': typeof ApiNodesIdMetricsRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
+  '/api/nodes/$id/upgrade': typeof ApiNodesIdUpgradeRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
 }
@@ -272,6 +328,8 @@ export interface FileRoutesById {
   '/tokens': typeof TokensRoute
   '/users': typeof UsersRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/logs': typeof ApiLogsRoute
+  '/api/metrics': typeof ApiMetricsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
@@ -287,14 +345,19 @@ export interface FileRoutesById {
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/openapi/json': typeof ApiOpenapiJsonRoute
   '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
+  '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
+  '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
+  '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/metrics': typeof ApiNodesIdMetricsRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
+  '/api/nodes/$id/upgrade': typeof ApiNodesIdUpgradeRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
 }
@@ -307,6 +370,8 @@ export interface FileRouteTypes {
     | '/tokens'
     | '/users'
     | '/api/events'
+    | '/api/logs'
+    | '/api/metrics'
     | '/api/nodes'
     | '/api/tokens'
     | '/api/users'
@@ -322,14 +387,19 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/openapi/json'
     | '/api/tokens/$id'
     | '/api/users/$username'
+    | '/api/auth/oidc/callback'
+    | '/api/auth/oidc/start'
+    | '/api/auth/oidc/status'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
     | '/api/nodes/$id/metrics'
     | '/api/nodes/$id/test'
+    | '/api/nodes/$id/upgrade'
     | '/api/nodes/$id/changes/$changeId'
     | '/api/nodes/$id/changes/$changeId/revert'
   fileRoutesByTo: FileRoutesByTo
@@ -339,6 +409,8 @@ export interface FileRouteTypes {
     | '/tokens'
     | '/users'
     | '/api/events'
+    | '/api/logs'
+    | '/api/metrics'
     | '/api/nodes'
     | '/api/tokens'
     | '/api/users'
@@ -354,14 +426,19 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/openapi/json'
     | '/api/tokens/$id'
     | '/api/users/$username'
+    | '/api/auth/oidc/callback'
+    | '/api/auth/oidc/start'
+    | '/api/auth/oidc/status'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
     | '/api/nodes/$id/metrics'
     | '/api/nodes/$id/test'
+    | '/api/nodes/$id/upgrade'
     | '/api/nodes/$id/changes/$changeId'
     | '/api/nodes/$id/changes/$changeId/revert'
   id:
@@ -372,6 +449,8 @@ export interface FileRouteTypes {
     | '/tokens'
     | '/users'
     | '/api/events'
+    | '/api/logs'
+    | '/api/metrics'
     | '/api/nodes'
     | '/api/tokens'
     | '/api/users'
@@ -387,14 +466,19 @@ export interface FileRouteTypes {
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/openapi/json'
     | '/api/tokens/$id'
     | '/api/users/$username'
+    | '/api/auth/oidc/callback'
+    | '/api/auth/oidc/start'
+    | '/api/auth/oidc/status'
     | '/api/dp/$nodeId/$'
     | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
     | '/api/nodes/$id/metrics'
     | '/api/nodes/$id/test'
+    | '/api/nodes/$id/upgrade'
     | '/api/nodes/$id/changes/$changeId'
     | '/api/nodes/$id/changes/$changeId/revert'
   fileRoutesById: FileRoutesById
@@ -406,6 +490,8 @@ export interface RootRouteChildren {
   TokensRoute: typeof TokensRoute
   UsersRoute: typeof UsersRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiLogsRoute: typeof ApiLogsRoute
+  ApiMetricsRoute: typeof ApiMetricsRoute
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
   ApiTokensRoute: typeof ApiTokensRouteWithChildren
   ApiUsersRoute: typeof ApiUsersRouteWithChildren
@@ -415,6 +501,10 @@ export interface RootRouteChildren {
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthStatusRoute: typeof ApiAuthStatusRoute
   ApiHealthSummaryRoute: typeof ApiHealthSummaryRoute
+  ApiOpenapiJsonRoute: typeof ApiOpenapiJsonRoute
+  ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
+  ApiAuthOidcStartRoute: typeof ApiAuthOidcStartRoute
+  ApiAuthOidcStatusRoute: typeof ApiAuthOidcStatusRoute
   ApiDpNodeIdSplatRoute: typeof ApiDpNodeIdSplatRoute
 }
 
@@ -460,6 +550,20 @@ declare module '@tanstack/react-router' {
       path: '/api/events'
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/logs': {
+      id: '/api/logs'
+      path: '/api/logs'
+      fullPath: '/api/logs'
+      preLoaderRoute: typeof ApiLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/metrics': {
+      id: '/api/metrics'
+      path: '/api/metrics'
+      fullPath: '/api/metrics'
+      preLoaderRoute: typeof ApiMetricsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/nodes': {
@@ -567,6 +671,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNodesImportRouteImport
       parentRoute: typeof ApiNodesRoute
     }
+    '/api/openapi/json': {
+      id: '/api/openapi/json'
+      path: '/api/openapi/json'
+      fullPath: '/api/openapi/json'
+      preLoaderRoute: typeof ApiOpenapiJsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tokens/$id': {
       id: '/api/tokens/$id'
       path: '/$id'
@@ -580,6 +691,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/users/$username'
       preLoaderRoute: typeof ApiUsersUsernameRouteImport
       parentRoute: typeof ApiUsersRoute
+    }
+    '/api/auth/oidc/callback': {
+      id: '/api/auth/oidc/callback'
+      path: '/api/auth/oidc/callback'
+      fullPath: '/api/auth/oidc/callback'
+      preLoaderRoute: typeof ApiAuthOidcCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/oidc/start': {
+      id: '/api/auth/oidc/start'
+      path: '/api/auth/oidc/start'
+      fullPath: '/api/auth/oidc/start'
+      preLoaderRoute: typeof ApiAuthOidcStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/oidc/status': {
+      id: '/api/auth/oidc/status'
+      path: '/api/auth/oidc/status'
+      fullPath: '/api/auth/oidc/status'
+      preLoaderRoute: typeof ApiAuthOidcStatusRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/dp/$nodeId/$': {
       id: '/api/dp/$nodeId/$'
@@ -621,6 +753,13 @@ declare module '@tanstack/react-router' {
       path: '/test'
       fullPath: '/api/nodes/$id/test'
       preLoaderRoute: typeof ApiNodesIdTestRouteImport
+      parentRoute: typeof ApiNodesIdRoute
+    }
+    '/api/nodes/$id/upgrade': {
+      id: '/api/nodes/$id/upgrade'
+      path: '/upgrade'
+      fullPath: '/api/nodes/$id/upgrade'
+      preLoaderRoute: typeof ApiNodesIdUpgradeRouteImport
       parentRoute: typeof ApiNodesIdRoute
     }
     '/api/nodes/$id/changes/$changeId': {
@@ -683,6 +822,7 @@ interface ApiNodesIdRouteChildren {
   ApiNodesIdConfigRoute: typeof ApiNodesIdConfigRoute
   ApiNodesIdMetricsRoute: typeof ApiNodesIdMetricsRoute
   ApiNodesIdTestRoute: typeof ApiNodesIdTestRoute
+  ApiNodesIdUpgradeRoute: typeof ApiNodesIdUpgradeRoute
 }
 
 const ApiNodesIdRouteChildren: ApiNodesIdRouteChildren = {
@@ -691,6 +831,7 @@ const ApiNodesIdRouteChildren: ApiNodesIdRouteChildren = {
   ApiNodesIdConfigRoute: ApiNodesIdConfigRoute,
   ApiNodesIdMetricsRoute: ApiNodesIdMetricsRoute,
   ApiNodesIdTestRoute: ApiNodesIdTestRoute,
+  ApiNodesIdUpgradeRoute: ApiNodesIdUpgradeRoute,
 }
 
 const ApiNodesIdRouteWithChildren = ApiNodesIdRoute._addFileChildren(
@@ -746,6 +887,8 @@ const rootRouteChildren: RootRouteChildren = {
   TokensRoute: TokensRoute,
   UsersRoute: UsersRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiLogsRoute: ApiLogsRoute,
+  ApiMetricsRoute: ApiMetricsRoute,
   ApiNodesRoute: ApiNodesRouteWithChildren,
   ApiTokensRoute: ApiTokensRouteWithChildren,
   ApiUsersRoute: ApiUsersRouteWithChildren,
@@ -755,6 +898,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthStatusRoute: ApiAuthStatusRoute,
   ApiHealthSummaryRoute: ApiHealthSummaryRoute,
+  ApiOpenapiJsonRoute: ApiOpenapiJsonRoute,
+  ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,
+  ApiAuthOidcStartRoute: ApiAuthOidcStartRoute,
+  ApiAuthOidcStatusRoute: ApiAuthOidcStatusRoute,
   ApiDpNodeIdSplatRoute: ApiDpNodeIdSplatRoute,
 }
 export const routeTree = rootRouteImport

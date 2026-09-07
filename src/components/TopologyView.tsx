@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { dpGet } from "#/lib/dataplane/client"
 import { normalizeBackends, normalizeFrontends } from "#/lib/normalize"
 import type { Frontend, Backend } from "#/lib/types"
+import { POLL } from "#/lib/poll"
 
 type RtServer = {
   name?: string
@@ -15,13 +16,33 @@ type RtServer = {
 
 type RtRow = { backend: string; servers: RtServer[] }
 
+type NativeStatEntry = {
+  type?: string
+  name?: string
+  stats?: {
+    scur?: number
+    stot?: number
+    req_rate?: number
+    bin?: number
+    bout?: number
+    status?: string
+  }
+}
+
 const stateColor = (s?: string): string => {
   if (s === "ready" || s === "up" || s === "UP") return "#10b981"
   if (s === "maint") return "#eab308"
   return "#ef4444"
 }
 
-export function TopologyView({ nodeId }: { nodeId: string }) {
+export function TopologyView({
+  nodeId,
+  onNavigate,
+}: {
+  nodeId: string
+  /** Navigate to a node-detail tab when a topology box is clicked. */
+  onNavigate?: (tab: string) => void
+}) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
@@ -41,6 +62,43 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
       ),
     enabled: mounted,
   })
+
+  // live traffic rates for hover tooltips / inline labels
+  const statsQ = useQuery({
+    queryKey: ["topo-stats", nodeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/dp/${nodeId}/services/haproxy/stats/native`)
+      if (!res.ok) throw new Error("stats unavailable")
+      const j = (await res.json()) as { stats?: NativeStatEntry[] }
+      const map: Record<string, { scur?: number; reqRate?: number; stot?: number }> = {}
+      for (const e of j.stats ?? []) {
+        if (!e.name) continue
+        map[e.name] = {
+          scur: e.stats?.scur,
+          reqRate: e.stats?.req_rate,
+          stot: e.stats?.stot,
+        }
+      }
+      return map
+    },
+    enabled: mounted,
+    refetchInterval: POLL.STATS,
+    retry: false,
+  })
+  const rates = statsQ.data ?? {}
+  const rateLabel = (name: string): string => {
+    const r = rates[name]
+    if (!r) return ""
+    const parts: string[] = []
+    if (typeof r.scur === "number") parts.push(`${r.scur} sess`)
+    if (typeof r.reqRate === "number") parts.push(`${r.reqRate} r/s`)
+    return parts.length ? ` · ${parts.join(" · ")}` : ""
+  }
+  const rateTitle = (name: string, kind: string): string => {
+    const r = rates[name]
+    if (!r) return `${kind} ${name} — click to open`
+    return `${kind} ${name}\n${r.scur ?? "?"} current sessions · ${r.reqRate ?? "?"} req/s · ${r.stot ?? "?"} total — click to open`
+  }
 
   const backends = useMemo(
     () => (beQ.data ?? []).filter((b) => !b.name.startsWith("_")),
@@ -112,6 +170,14 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
   const srvTotalH = srvRows.length > 0 ? Math.max(...srvRows.map((r) => r.y)) - beTop + 40 : beBlockH
   const total = Math.max(totalH, srvTop + srvTotalH)
 
+  const clickable = (tab: string) =>
+    onNavigate
+      ? {
+          style: { cursor: "pointer" as const },
+          onClick: () => onNavigate(tab),
+        }
+      : {}
+
   return (
     <div className="overflow-auto rounded-lg border border-border p-2">
       <svg viewBox={`0 0 ${W} ${total}`} className="w-full min-w-[640px]" role="img" aria-label="service topology">
@@ -147,7 +213,8 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
 
         {/* frontends */}
         {frontends.map((f, i) => (
-          <g key={f.name}>
+          <g key={f.name} {...clickable("frontends")}>
+            <title>{rateTitle(f.name, "Frontend")}</title>
             <rect
               x={colX.fe}
               y={feY(i)}
@@ -160,6 +227,7 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
             <text x={colX.fe + 8} y={feY(i) + 18} fontSize="12" fill="#1e1b4b">
               {f.name} :
               {(Array.isArray(f.bind) ? f.bind : []).map((b) => b.port).join("/")}
+              {rateLabel(f.name)}
             </text>
           </g>
         ))}
@@ -168,7 +236,8 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
         {backends.map((b, i) => {
           const st = serversOf(b).some((s) => s.admin_state === "maint")
           return (
-            <g key={b.name}>
+            <g key={b.name} {...clickable("backends")}>
+              <title>{rateTitle(b.name, "Backend")}</title>
               <rect
                 x={colX.be}
                 y={beY(i)}
@@ -180,6 +249,7 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
               />
               <text x={colX.be + 8} y={beY(i) + 18} fontSize="12" fill="#0c4a6e">
                 {b.name}
+                {rateLabel(b.name)}
               </text>
             </g>
           )
@@ -190,19 +260,22 @@ export function TopologyView({ nodeId }: { nodeId: string }) {
           const adm = r.server.admin_state ?? "ready"
           const color = stateColor(adm === "ready" ? r.server.operational_state ?? "up" : "maint")
           return (
-            <g key={`s-${i}`}>
+            <g key={`s-${i}`} {...clickable("stats")}>
+              <title>{rateTitle(r.server.name ?? "", "Server")}</title>
               <circle cx={colX.srv + 8} cy={r.y + 10} r={5} fill={color} />
               <text x={colX.srv + 20} y={r.y + 14} fontSize="11" fill="#334155">
                 {r.server.name}
                 {r.server.address ? ` (${r.server.address})` : ""}
+                {rateLabel(r.server.name ?? "")}
               </text>
             </g>
           )
         })}
       </svg>
       <p className="px-2 pb-1 text-xs text-muted-foreground">
-        Read-only view: frontends link to their default_backend; server dots are
-        colored by runtime state (green up, yellow maint, red down).
+        Server dots are colored by runtime state (green up, yellow maint, red
+        down); boxes show live session counts and request rates. Click a
+        frontend, backend or server to jump to the matching tab.
       </p>
     </div>
   )

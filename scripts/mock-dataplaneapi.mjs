@@ -218,6 +218,7 @@ const server = createServer((req, res) => {
         mode: json.mode ?? be.mode,
         balance: json.balance ?? be.balance,
         description: json.description ?? be.description,
+        stick_table: json.stick_table ?? be.stick_table,
       })
       return send(res, 200, backends.get(name))
     }
@@ -257,23 +258,25 @@ const server = createServer((req, res) => {
       return send(res, 200, runtimeServer(beName, s))
     }
 
-    // config ACLs per parent section (frontend/backend)
+    // config rule subresources per parent section (frontend/backend):
+    // http_request_rules, http_response_rules, tcp_request_rules,
+    // backend_switching_rules, http_checks, tcp_checks
     const ruleMatch = p.match(
-      /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/http_request_rules\/?(\d+)?$/,
+      /^services\/haproxy\/configuration\/(frontends|backends)\/([^/]+)\/(http_request_rules|http_response_rules|tcp_request_rules|backend_switching_rules|http_checks|tcp_checks)\/?(\d+)?$/,
     )
     if (ruleMatch) {
-      const key = `rules|${ruleMatch[1]}|${decodeURIComponent(ruleMatch[2])}`
+      const key = `rules|${ruleMatch[3]}|${ruleMatch[1]}|${decodeURIComponent(ruleMatch[2])}`
       if (!acls.has(key)) acls.set(key, [])
       const list = acls.get(key)
-      if (method === "GET" && ruleMatch[3] === undefined) {
+      if (method === "GET" && ruleMatch[4] === undefined) {
         return send(res, 200, list)
       }
       if (method === "POST") {
         list.push(json)
         return send(res, 201, json)
       }
-      if (method === "DELETE" && ruleMatch[3] !== undefined) {
-        list.splice(Number(ruleMatch[3]), 1)
+      if (method === "DELETE" && ruleMatch[4] !== undefined) {
+        list.splice(Number(ruleMatch[4]), 1)
         return send(res, 202, {})
       }
     }

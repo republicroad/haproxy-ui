@@ -4,6 +4,71 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-09-07
+
+Rules, protection and operations release: a full traffic-rules engine,
+HAProxy-native WAF + bot management, access-log ingestion, Prometheus
+endpoint, OIDC/SSO, SMTP alerts and upgrade orchestration.
+
+### Added
+
+#### Rules engine (new "Rules" tab)
+- HTTP request rules expanded beyond redirect/deny: set/add/del-header
+  with optional conditions
+- HTTP response rules (set/add/del-header, deny) per frontend/backend
+- TCP request rules (accept/reject) per frontend/backend
+- `use_backend` backend switching rules on frontends (target backend +
+  if/unless condition)
+- Backend active health-check expectations (`http-check expect`
+  status/string/rlen) managed per backend
+- One-click per-client-IP rate limit preset: writes the backend
+  stick-table, a `track-sc0` rule and a `deny 429` rule in a single
+  validated transaction
+
+#### WAF & bot management (new "WAF" tab)
+- HAProxy-native protection bundles: SQL injection, XSS, path
+  traversal, scanner user-agents and dangerous HTTP methods
+- Custom WAF rules (criterion + match value) compiled to named ACLs +
+  deny rules
+- Bot management: editable blocked-signature list, verified-bots
+  allowlist, and a "verified bots only" mode that blocks generic
+  automation unless allowlisted
+- Every toggle is a transaction of named ACL lines plus one deny rule
+  (no sidecar daemons), recorded in the change history
+
+#### Observability
+- UDP syslog access-log receiver (`HAPROXY_UI_LOG_PORT`) with sampling
+  (`HAPROXY_UI_LOG_SAMPLE`), retention (`HAPROXY_UI_LOG_KEEP`) and a
+  filterable request explorer tab per node (frontend/status class/path)
+- Prometheus exposition endpoint `/api/metrics`: node health, versions,
+  latency and the latest sampled per-object stats
+- Topology view: live session counts and request rates inline, hover
+  details, and click-through navigation to the matching tab
+- OpenAPI 3.1 document at `/api/openapi.json`, schemas generated from
+  the API's own zod validators
+
+#### Platform
+- OIDC/SSO sign-in (authorization code + PKCE-less state cookie,
+  RS256 JWKS verification, discovery caching) with e-mail based user
+  provisioning and `HAPROXY_UI_OIDC_ADMIN_EMAILS` admin mapping
+- SMTP alert emails alongside webhooks (STARTTLS/implicit TLS,
+  AUTH PLAIN/LOGIN, password encrypted at rest, per-channel test send)
+- HAProxy binary upgrade orchestration per node: config snapshot,
+  optional server drain, version verification and run history
+- Rules surface documented for automation (`/api/logs`, `/api/metrics`,
+  `/api/nodes/{id}/upgrade`, switching rules, http checks, rate limit)
+
+#### Fixed
+- Node detail page loaded empty frontend/backend lists on the ACLs tab
+  when visited directly (section pickers are now populated on every
+  dependent tab)
+
+### Changed
+- Frontend/backend lists now load on every tab that needs them, not
+  only their own tabs
+- TanStack dependencies pinned to semver ranges (previously `latest`)
+  with Dependabot weekly updates
+
 ## [1.0.0] - 2026-09-06
 
 First stable release. Full lifecycle management for HAProxy fleets via
@@ -99,4 +164,5 @@ the official Data Plane API (v2/v3).
   tokens with runtime revocation
 - CSRF same-origin enforcement and security response headers
 
+[1.1.0]: https://github.com/example/haproxy-ui/releases/tag/v1.1.0
 [1.0.0]: https://github.com/example/haproxy-ui/releases/tag/v1.0.0

@@ -78,7 +78,20 @@ export const backendInputSchema = z.object({
 
 export const changeMetaSchema = z.object({
   kind: z.enum(["create", "delete", "update"]),
-  resource: z.enum(["frontend", "backend", "server", "acl", "map", "rule", "log", "userlist", "user"]),
+  resource: z.enum([
+    "frontend",
+    "backend",
+    "server",
+    "acl",
+    "map",
+    "rule",
+    "log",
+    "userlist",
+    "user",
+    "switch",
+    "check",
+    "ratelimit",
+  ]),
   target: z.string().trim().min(1),
   parent: z.string().trim().optional(),
   payload: z.unknown().optional(),
@@ -95,6 +108,28 @@ export const aclInputSchema = z.object({
 export const mapEntryInputSchema = z.object({
   key: z.string().trim().min(1, "key is required"),
   value: z.string().trim().min(1, "value is required"),
+})
+
+/** use_backend rule on a frontend: switch to `name` when cond_test holds. */
+export const switchingRuleInputSchema = z.object({
+  name: nameField,
+  cond: z.enum(["if", "unless"]).default("if"),
+  cond_test: z.string().trim().min(1, "condition is required"),
+})
+
+/** Backend active health check expectation (http-check expect). */
+export const healthCheckInputSchema = z.object({
+  type: z.enum(["status", "string", "rlen"]),
+  value: z.string().trim().min(1, "value is required"),
+})
+
+/** Rate-limit preset inputs (stick-table + track + deny on a backend). */
+export const rateLimitInputSchema = z.object({
+  maxRequests: z.coerce.number().int().min(1).max(1_000_000),
+  periodSeconds: z.coerce.number().int().min(1).max(3600).default(10),
+  denyStatus: z.coerce.number().int().refine((n) => [403, 429].includes(n), {
+    message: "status must be 403 or 429",
+  }).default(429),
 })
 
 /** Flatten a ZodError into { field: message } for API responses / form display. */

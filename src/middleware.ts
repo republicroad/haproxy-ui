@@ -26,7 +26,10 @@ export const authMiddleware = createMiddleware().server(async ({ request, next }
       path === "/login" ||
       path === "/api/auth/login" ||
       path === "/api/auth/logout" ||
-      path === "/api/auth/status"
+      path === "/api/auth/status" ||
+      path === "/api/auth/oidc/status" ||
+      path === "/api/auth/oidc/start" ||
+      path === "/api/auth/oidc/callback"
     if (isPublic) return next()
 
     if (identityFromRequest(request)) {

@@ -92,6 +92,70 @@ const run = async () => {
   console.log("node status after test:", nodeAfter.status, "version:", nodeAfter.haproxyVersion)
   if (nodeAfter.status !== "up" || !nodeAfter.haproxyVersion) throw new Error("status not persisted")
 
+  // ---- rules: switching rule + health check + rate limit preset ----
+  tx = await newTx()
+  r = await dp(
+    "POST",
+    `services/haproxy/configuration/frontends/fe_int/backend_switching_rules?transaction_id=${tx}`,
+    { name: "be_int", cond: "if", cond_test: "{ path_beg /api }" },
+  )
+  console.log("switching rule:", r.status, JSON.stringify(await j(r)))
+  await commit(tx)
+
+  tx = await newTx()
+  r = await dp(
+    "POST",
+    `services/haproxy/configuration/backends/be_int/http_checks?transaction_id=${tx}`,
+    { type: "status", value: "200" },
+  )
+  console.log("http check:", r.status, JSON.stringify(await j(r)))
+  await commit(tx)
+
+  tx = await newTx()
+  r = await dp(
+    "PUT",
+    `services/haproxy/configuration/backends/be_int?transaction_id=${tx}`,
+    {
+      stick_table: {
+        type: "ip",
+        size: "100k",
+        expire: "10s",
+        store: ["http_req_rate(10s)"],
+      },
+    },
+  )
+  console.log("stick_table:", r.status)
+  r = await dp(
+    "POST",
+    `services/haproxy/configuration/backends/be_int/http_request_rules?transaction_id=${tx}`,
+    { type: "track-sc0", var_name: "src" },
+  )
+  console.log("track rule:", r.status)
+  r = await dp(
+    "POST",
+    `services/haproxy/configuration/backends/be_int/http_request_rules?transaction_id=${tx}`,
+    {
+      type: "deny",
+      deny_status: 429,
+      http_rule_condition: { cond: "if", val: "{ src http_req_rate(10s) gt 50 }" },
+    },
+  )
+  console.log("deny rule:", r.status)
+  await commit(tx)
+
+  r = await dp("GET", "services/haproxy/configuration/frontends/fe_int/backend_switching_rules")
+  const switchRules = await j(r)
+  console.log("switching rules:", r.status, JSON.stringify(switchRules))
+  if (!JSON.stringify(switchRules).includes("be_int")) throw new Error("switching rule not persisted")
+  r = await dp("GET", "services/haproxy/configuration/backends/be_int/http_checks")
+  const checks = await j(r)
+  console.log("http checks:", r.status, JSON.stringify(checks))
+  if (!JSON.stringify(checks).includes("status")) throw new Error("http check not persisted")
+  r = await dp("GET", "services/haproxy/configuration/backends/be_int/http_request_rules")
+  const reqRules = await j(r)
+  console.log("backend request rules:", r.status, JSON.stringify(reqRules))
+  if (!JSON.stringify(reqRules).includes("track-sc0")) throw new Error("track rule not persisted")
+
   await fetch(`${BASE}/api/nodes/${id}`, { method: "DELETE" })
   console.log("DONE")
 }

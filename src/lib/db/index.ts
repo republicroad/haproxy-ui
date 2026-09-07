@@ -65,6 +65,17 @@ db.exec(`
     webhook_url TEXT NOT NULL DEFAULT '',
     enabled INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS smtp_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    host TEXT NOT NULL DEFAULT '',
+    port INTEGER NOT NULL DEFAULT 587,
+    secure INTEGER NOT NULL DEFAULT 0,
+    username TEXT NOT NULL DEFAULT '',
+    password TEXT NOT NULL DEFAULT '',
+    from_addr TEXT NOT NULL DEFAULT '',
+    to_addrs TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 0
+  );
   CREATE TABLE IF NOT EXISTS alert_state (
     node_id TEXT PRIMARY KEY,
     last_ok INTEGER,
@@ -100,6 +111,33 @@ db.exec(`
     status TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_metrics_node_ts ON metric_samples(node_id, obj_name, ts);
+  CREATE TABLE IF NOT EXISTS log_records (
+    id TEXT PRIMARY KEY,
+    node_id TEXT,
+    ts INTEGER NOT NULL,
+    client_ip TEXT,
+    frontend TEXT,
+    backend TEXT,
+    server TEXT,
+    status INTEGER,
+    bytes_read INTEGER,
+    total_time_ms INTEGER,
+    method TEXT,
+    path TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_logs_ts ON log_records(ts);
+  CREATE INDEX IF NOT EXISTS idx_logs_node_ts ON log_records(node_id, ts);
+  CREATE TABLE IF NOT EXISTS upgrade_runs (
+    id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    from_version TEXT,
+    to_version TEXT,
+    result TEXT,
+    actor TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_upgrade_node ON upgrade_runs(node_id, ts);
 `)
 
 // Lightweight migration for databases created before the actor column
@@ -485,6 +523,63 @@ export function setAlertState(nodeId: string, lastOk: boolean, lastAlertTs?: num
   ).run(nodeId, lastOk ? 1 : 0, lastAlertTs ?? 0, lastAlertTs ?? null)
 }
 
+export type SmtpSettings = {
+  host: string
+  port: number
+  secure: boolean
+  username: string
+  password: string
+  fromAddr: string
+  toAddrs: string[]
+  enabled: boolean
+}
+
+export function getSmtpSettings(): SmtpSettings {
+  db.exec(
+    "INSERT OR IGNORE INTO smtp_settings (id) VALUES (1)",
+  )
+  const row = db
+    .prepare(
+      "SELECT host, port, secure, username, password, from_addr, to_addrs, enabled FROM smtp_settings WHERE id = 1",
+    )
+    .get() as {
+    host: string
+    port: number
+    secure: number
+    username: string
+    password: string
+    from_addr: string
+    to_addrs: string
+    enabled: number
+  }
+  return {
+    host: row.host,
+    port: row.port,
+    secure: row.secure === 1,
+    username: row.username,
+    password: decryptSecret(row.password),
+    fromAddr: row.from_addr,
+    toAddrs: row.to_addrs ? row.to_addrs.split(",") : [],
+    enabled: row.enabled === 1,
+  }
+}
+
+export function setSmtpSettings(s: SmtpSettings): void {
+  db.exec("INSERT OR IGNORE INTO smtp_settings (id) VALUES (1)")
+  db.prepare(
+    "UPDATE smtp_settings SET host = ?, port = ?, secure = ?, username = ?, password = ?, from_addr = ?, to_addrs = ?, enabled = ? WHERE id = 1",
+  ).run(
+    s.host,
+    s.port,
+    s.secure ? 1 : 0,
+    s.username,
+    encryptSecret(s.password),
+    s.fromAddr,
+    s.toAddrs.join(","),
+    s.enabled ? 1 : 0,
+  )
+}
+
 export type UserRow = {
   username: string
   passHash: string
@@ -704,4 +799,162 @@ export function purgeMetricSamples(keepHours: number): number {
   const cutoff = Date.now() - keepHours * 3_600_000
   const r = db.prepare("DELETE FROM metric_samples WHERE ts < ?").run(cutoff)
   return Number(r.changes)
+}
+
+// --- access-log ingestion (UDP syslog receiver) ---
+
+export type LogRecord = {
+  nodeId: string | null
+  ts: number
+  clientIp: string | null
+  frontend: string | null
+  backend: string | null
+  server: string | null
+  status: number | null
+  bytesRead: number | null
+  totalTimeMs: number | null
+  method: string | null
+  path: string | null
+}
+
+export function insertLogRecords(records: LogRecord[]): void {
+  const stmt = db.prepare(
+    "INSERT INTO log_records (id, node_id, ts, client_ip, frontend, backend, server, status, bytes_read, total_time_ms, method, path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  )
+  for (const r of records) {
+    stmt.run(
+      crypto.randomUUID(),
+      r.nodeId,
+      r.ts,
+      r.clientIp,
+      r.frontend,
+      r.backend,
+      r.server,
+      r.status,
+      r.bytesRead,
+      r.totalTimeMs,
+      r.method,
+      r.path,
+    )
+  }
+}
+
+export type LogQuery = {
+  nodeId?: string
+  frontend?: string
+  statusClass?: 2 | 4 | 5
+  pathContains?: string
+  hours?: number
+  limit?: number
+}
+
+export function listLogRecords(q: LogQuery = {}): (Omit<LogRecord, "nodeId"> & { nodeId: string | null })[] {
+  const where: string[] = []
+  const vals: (string | number)[] = []
+  if (q.nodeId) {
+    where.push("node_id = ?")
+    vals.push(q.nodeId)
+  }
+  if (q.frontend) {
+    where.push("frontend = ?")
+    vals.push(q.frontend)
+  }
+  if (q.statusClass) {
+    where.push("status >= ? AND status < ?")
+    vals.push(q.statusClass * 100, (q.statusClass + 1) * 100)
+  }
+  if (q.pathContains) {
+    where.push("path LIKE ?")
+    vals.push(`%${q.pathContains}%`)
+  }
+  const since = Date.now() - (q.hours ?? 24) * 3_600_000
+  where.push("ts >= ?")
+  vals.push(since)
+  const limit = Math.min(q.limit ?? 200, 1000)
+  return (
+    db
+      .prepare(
+        `SELECT node_id, ts, client_ip, frontend, backend, server, status, bytes_read, total_time_ms, method, path
+         FROM log_records WHERE ${where.join(" AND ")} ORDER BY ts DESC LIMIT ${limit}`,
+      )
+      .all(...vals) as {
+      node_id: string | null
+      ts: number
+      client_ip: string | null
+      frontend: string | null
+      backend: string | null
+      server: string | null
+      status: number | null
+      bytes_read: number | null
+      total_time_ms: number | null
+      method: string | null
+      path: string | null
+    }[]
+  ).map((r) => ({
+    nodeId: r.node_id,
+    ts: r.ts,
+    clientIp: r.client_ip,
+    frontend: r.frontend,
+    backend: r.backend,
+    server: r.server,
+    status: r.status,
+    bytesRead: r.bytes_read,
+    totalTimeMs: r.total_time_ms,
+    method: r.method,
+    path: r.path,
+  }))
+}
+
+/** Purge ingested access-log records older than `hours`. Returns deleted count. */
+export function purgeLogRecords(keepHours: number): number {
+  const cutoff = Date.now() - keepHours * 3_600_000
+  const r = db.prepare("DELETE FROM log_records WHERE ts < ?").run(cutoff)
+  return Number(r.changes)
+}
+
+// --- HAProxy binary upgrade orchestration ---
+
+export type UpgradeRun = {
+  id: string
+  nodeId: string
+  ts: number
+  action: "prepare" | "verify"
+  fromVersion: string | null
+  toVersion: string | null
+  result: string
+  actor: string | null
+}
+
+export function insertUpgradeRun(r: Omit<UpgradeRun, "id">): string {
+  const id = crypto.randomUUID()
+  db.prepare(
+    "INSERT INTO upgrade_runs (id, node_id, ts, action, from_version, to_version, result, actor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(id, r.nodeId, r.ts, r.action, r.fromVersion, r.toVersion, r.result, r.actor)
+  return id
+}
+
+export function listUpgradeRuns(nodeId: string, limit = 20): Omit<UpgradeRun, "id">[] {
+  return (
+    db
+      .prepare(
+        "SELECT node_id, ts, action, from_version, to_version, result, actor FROM upgrade_runs WHERE node_id = ? ORDER BY ts DESC LIMIT ?",
+      )
+      .all(nodeId, limit) as {
+      node_id: string
+      ts: number
+      action: string
+      from_version: string | null
+      to_version: string | null
+      result: string
+      actor: string | null
+    }[]
+  ).map((r) => ({
+    nodeId: r.node_id,
+    ts: r.ts,
+    action: r.action as "prepare" | "verify",
+    fromVersion: r.from_version,
+    toVersion: r.to_version,
+    result: r.result,
+    actor: r.actor,
+  }))
 }

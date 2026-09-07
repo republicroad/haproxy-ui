@@ -1,4 +1,4 @@
-# [![v1.0.0](https://img.shields.io/badge/version-1.0.0-blue)](CHANGELOG.md)
+# [![v1.1.0](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
 
 # HAProxy UI
 
@@ -25,6 +25,20 @@ Query/Table, `node:sqlite`, and zod.
   the native stats API.
 - **ACL management** — add/remove ACL lines on any frontend/backend,
   applied through transactions and recorded in history.
+- **Rules engine** — HTTP request rules (redirect, deny, set/add/del
+  header), HTTP response rules, TCP request rules, `use_backend`
+  switching rules, backend active health-check expectations
+  (`http-check expect`) and a one-click per-client-IP **rate limit
+  preset** (stick-table + track-sc0 + deny) — all inside validated
+  transactions.
+- **WAF & bot management** — HAProxy-native protection bundles
+  (SQLi/XSS/path-traversal/scanner-UA/dangerous-method presets, custom
+  regex rules, blocked-bot signatures and a verified-bots allowlist).
+  Every toggle compiles to named ACL lines + one deny rule, so no
+  sidecar daemons are involved.
+- **Access-log explorer** — optional UDP syslog receiver ingests
+  HAProxy access logs (sampling + retention) with a filterable
+  request tab per node.
 - **Runtime maps** — inspect and edit stick-table-driven map files
   (key/value CRUD, applies live without reload).
 - **Auth userlists & DNS resolvers** — manage HAProxy Basic-Auth
@@ -53,14 +67,23 @@ Query/Table, `node:sqlite`, and zod.
   stripped) and full per-node config bundles (JSON).
 - **Fleet health dashboard** — per-node status with latency history bars,
   server UP counts, and down-node/not-UP-server alerts.
-- **Alert webhooks** — POST notifications (Slack/Discord/generic) on
-  node down/recovery transitions, with a 5-minute cooldown and a
-  "send test" button.
+- **Alert webhooks & email** — POST notifications (Slack/Discord/generic)
+  and SMTP emails on node down/recovery transitions, with a 5-minute
+  cooldown and "send test" buttons for both channels.
 - **Security** — optional session-based authentication (signed HttpOnly
   cookie, login page, logout revocation, login rate limiting),
   AES-256-GCM encrypted credential storage at rest, and multi-user
   accounts with `admin`/`viewer` roles (viewer is read-only, last-admin
-  protection, user management UI).
+  protection, user management UI). **OIDC/SSO** sign-in for enterprise
+  identity providers (discovery + RS256 JWKS verification, e-mail
+  based provisioning with admin mapping).
+- **Prometheus endpoint** — `/api/metrics` exposes fleet health, node
+  versions and the latest sampled stats in the Prometheus text format.
+- **Upgrade orchestration** — per-node HAProxy binary upgrade wizard:
+  config snapshot (rollback artifact), optional server drain, then
+  version verification against the target with a run history.
+- **OpenAPI spec** — `/api/openapi.json` serves a 3.1 document with
+  schemas generated from the same zod validators the API uses.
 - **Automation API** — admin-minted bearer tokens (hash-only storage,
   copy-once, instant revocation) let CI/curl scripts call the same
   REST API the UI uses.
@@ -95,6 +118,12 @@ containers).
 | `HAPROXY_UI_HEALTH_KEEP` | `720` | Max health-check rows per node |
 | `HAPROXY_UI_BACKUP_DIR` | *(unset)* | Enable daily config backups to this directory |
 | `HAPROXY_UI_MAINTENANCE` | `on` | Set `off` to disable the background scheduler |
+| `HAPROXY_UI_LOG_PORT` | *(unset)* | UDP port for the HAProxy access-log receiver |
+| `HAPROXY_UI_LOG_SAMPLE` | `100` | Access-log sampling percent (1-100) |
+| `HAPROXY_UI_LOG_KEEP` | `24` | Access-log retention hours |
+| `HAPROXY_UI_OIDC_ISSUER` | *(unset)* | OIDC issuer (enables SSO with client id/secret) |
+| `HAPROXY_UI_OIDC_CLIENT_ID` / `_SECRET` | *(unset)* | OIDC client credentials |
+| `HAPROXY_UI_OIDC_ADMIN_EMAILS` | *(unset)* | Comma list of e-mails that get the admin role |
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | Production server bind (prod-server.mjs) |
 
 ## Production
@@ -172,6 +201,7 @@ Browser ─┬─ /api/nodes (CRUD, test, export/import, diff) ──> TanStack 
 
 ## Roadmap
 
-- Access-log ingestion and request explorer (cost/benefit under evaluation)
-- OIDC/SSO integration for enterprise identity providers
-- HAProxy binary upgrade orchestration
+- SPOE/Coraza deep packet inspection as an optional WAF backend
+  (the built-in WAF stays HAProxy-native)
+- Multi-cluster RBAC (per-group admin scopes)
+- Anomaly alerts from ingested access logs (spike/5xx detection)

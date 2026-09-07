@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { Label } from "#/components/ui/label"
@@ -11,6 +11,14 @@ function LoginPage() {
   const [pass, setPass] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [sso, setSso] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch("/api/auth/oidc/status")
+      .then((r) => (r.ok ? r.json() : { configured: false }))
+      .then((j: { configured: boolean }) => setSso(j.configured))
+      .catch(() => setSso(false))
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +52,25 @@ function LoginPage() {
             Use the credentials configured via HAPROXY_UI_USER / HAPROXY_UI_PASS
           </p>
         </div>
+        {sso && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              window.location.href = "/api/auth/oidc/start"
+            }}
+          >
+            Sign in with SSO
+          </Button>
+        )}
+        {sso && (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or with a local account
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="login-user">Username</Label>
           <Input

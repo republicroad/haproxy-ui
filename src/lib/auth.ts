@@ -6,6 +6,7 @@ import {
   listUsers,
   touchApiToken,
 } from "#/lib/db"
+import { isOidcConfigured } from "#/lib/oidcEnv"
 
 export const SESSION_COOKIE = "hui_session"
 const SESSION_TTL_MS = 7 * 86_400_000
@@ -20,9 +21,9 @@ export function authMode(): AuthMode {
   return "off"
 }
 
-/** Whether any authentication is active. */
+/** Whether any authentication is active (incl. SSO-only deployments). */
 export function authEnabled(): boolean {
-  return authMode() !== "off"
+  return authMode() !== "off" || isOidcConfigured()
 }
 
 /**

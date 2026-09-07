@@ -5,10 +5,12 @@ import {
   insertMetricSamples,
   listLatestHealthChecks,
   purgeMetricSamples,
+  purgeLogRecords,
   trimHealthChecks,
 } from "#/lib/db"
 import { exportNodeConfig } from "#/lib/configExport"
 import { proxyToNode } from "#/lib/dataplane/proxy"
+import { LOG_KEEP_HOURS, startLogIngest } from "#/lib/logIngest"
 import { writeFileSync, mkdirSync } from "node:fs"
 
 const INTERVAL_MS = 60 * 60 * 1000 // hourly
@@ -95,6 +97,12 @@ async function runOnce(): Promise<void> {
     console.log(`[maintenance] purged ${purged} change records older than ${RETENTION_DAYS}d`)
   }
 
+  // 2b. purge ingested access-log records
+  const purgedLogs = purgeLogRecords(LOG_KEEP_HOURS)
+  if (purgedLogs > 0) {
+    console.log(`[maintenance] purged ${purgedLogs} access-log records older than ${LOG_KEEP_HOURS}h`)
+  }
+
   // 3. optional raw-config backups
   if (BACKUP_DIR) {
     const dir = resolve(BACKUP_DIR)
@@ -139,6 +147,9 @@ export function startMaintenance(): void {
   console.log(
     `[maintenance] metrics sampler started (interval=${METRICS_INTERVAL_MS / 1000}s, keep=${METRICS_KEEP_HOURS}h)`,
   )
+
+  // UDP access-log receiver (no-op unless HAPROXY_UI_LOG_PORT is set)
+  startLogIngest()
 }
 
 // Auto-start when this module is loaded on the server side (dev + prod).

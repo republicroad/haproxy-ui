@@ -20,13 +20,6 @@ import { aclInputSchema, mapEntryInputSchema, fieldErrors } from "#/lib/schemas"
 
 type Acl = { acl_name: string; criterion: string; value?: string }
 type MapEntry = { id: string; key: string; value: string }
-type HttpRule = {
-  type: string
-  http_rule_condition?: { cond: string; val?: string }
-  redirect_code?: number
-  redirect_destination?: string
-  deny_status?: number
-}
 
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null
@@ -51,13 +44,6 @@ export function AclsTab({
   const [parentName, setParentName] = useState<string>("")
   const effectiveName = parentName || options[0]?.name || ""
   const [form, setForm] = useState({ acl_name: "", criterion: "", value: "" })
-  const [ruleForm, setRuleForm] = useState({
-    type: "redirect" as "redirect" | "deny",
-    redirectCode: "301",
-    redirectDestination: "",
-    denyStatus: "403",
-    condVal: "",
-  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [pending, setPending] = useState(false)
 
@@ -74,18 +60,9 @@ export function AclsTab({
   const acls = aclsQ.data ?? []
 
   const basePath = `services/haproxy/configuration/${parentType}/${encodeURIComponent(effectiveName)}/acls`
-  const rulesPath = `services/haproxy/configuration/${parentType}/${encodeURIComponent(effectiveName)}/http_request_rules`
-
-  const rulesQ = useQuery({
-    queryKey: ["rules", nodeId, key],
-    queryFn: () => dpGet<HttpRule[]>(nodeId, rulesPath),
-    enabled: Boolean(effectiveName),
-  })
-  const rules = rulesQ.data ?? []
 
   const reload = () => {
     qc.invalidateQueries({ queryKey: ["acls", nodeId, key] })
-    qc.invalidateQueries({ queryKey: ["rules", nodeId, key] })
     onChanged()
   }
 
@@ -125,81 +102,6 @@ export function AclsTab({
       reload()
     } catch (e) {
       toast.error("Failed to add ACL", { description: (e as Error).message })
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const addRule = async () => {
-    const body: HttpRule = { type: ruleForm.type }
-    if (ruleForm.condVal.trim()) {
-      body.http_rule_condition = { cond: "if", val: ruleForm.condVal.trim() }
-    }
-    if (ruleForm.type === "redirect") {
-      const code = Number(ruleForm.redirectCode)
-      if (![301, 302, 307, 308].includes(code)) {
-        setErrors({ redirect_code: "code must be 301/302/307/308" })
-        return
-      }
-      if (!ruleForm.redirectDestination.trim()) {
-        setErrors({ redirect_destination: "destination is required" })
-        return
-      }
-      body.redirect_code = code
-      body.redirect_destination = ruleForm.redirectDestination.trim()
-    } else {
-      const status = Number(ruleForm.denyStatus)
-      if (![403, 404].includes(status)) {
-        setErrors({ deny_status: "status must be 403 or 404" })
-        return
-      }
-      body.deny_status = status
-    }
-    setErrors({})
-    setPending(true)
-    try {
-      await withTransaction(
-        nodeId,
-        async (tx) => {
-          await dpPost(nodeId, `${rulesPath}/${rules.length}`, body, tx)
-        },
-        {
-          kind: "create",
-          resource: "rule",
-          target: `${ruleForm.type}${ruleForm.redirectDestination ? `→${ruleForm.redirectDestination}` : ""}`,
-          parent: `${parentType.replace(/s$/, "")}/${effectiveName}`,
-          payload: body,
-        },
-      )
-      toast.success("Request rule added")
-      reload()
-    } catch (e) {
-      toast.error("Failed to add rule", { description: (e as Error).message })
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const removeRule = async (rule: HttpRule, index: number) => {
-    setPending(true)
-    try {
-      await withTransaction(
-        nodeId,
-        async (tx) => {
-          await dpDelete(nodeId, `${rulesPath}/${index}`, tx)
-        },
-        {
-          kind: "delete",
-          resource: "rule",
-          target: rule.type,
-          parent: `${parentType.replace(/s$/, "")}/${effectiveName}`,
-          payload: rule,
-        },
-      )
-      toast.success("Request rule removed")
-      reload()
-    } catch (e) {
-      toast.error("Failed to remove rule", { description: (e as Error).message })
     } finally {
       setPending(false)
     }
@@ -356,127 +258,6 @@ export function AclsTab({
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Applied in a validated transaction; recorded in history.
-        </p>
-      </div>
-
-      {/* ---- HTTP request rules ---- */}
-      <div className="mb-1 mt-2 text-sm font-semibold">HTTP request rules</div>
-      <div className="overflow-hidden rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2">Params</th>
-              <th className="px-3 py-2">Condition</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rules.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-3 text-muted-foreground">
-                  No HTTP request rules on this section.
-                </td>
-              </tr>
-            )}
-            {rules.map((r, i) => (
-              <tr key={`${r.type}-${i}`} className="border-t border-border">
-                <td className="px-3 py-2 text-muted-foreground">{i}</td>
-                <td className="px-3 py-2 font-medium">{r.type}</td>
-                <td className="px-3 py-2">
-                  {r.type === "redirect" &&
-                    `${r.redirect_code ?? 302} → ${r.redirect_destination ?? "?"}`}
-                  {r.type === "deny" && `status ${r.deny_status ?? 403}`}
-                  {!["redirect", "deny"].includes(r.type) && r.type}
-                </td>
-                <td className="px-3 py-2">
-                  {r.http_rule_condition
-                    ? `${r.http_rule_condition.cond} ${r.http_rule_condition.val ?? ""}`
-                    : "always"}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <Button
-                    size="xs"
-                    variant="destructive"
-                    disabled={pending}
-                    onClick={() => removeRule(r, i)}
-                  >
-                    Delete
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="rounded-lg border border-border p-3">
-        <div className="mb-2 text-sm font-medium">Add request rule</div>
-        <div className="flex flex-wrap items-start gap-2">
-          <div>
-            <Select value={ruleForm.type} onValueChange={(v) => setRuleForm({ ...ruleForm, type: (v ?? "redirect") as "redirect" | "deny" })}>
-              <SelectTrigger className="w-[130px]" aria-label="rule type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="redirect">redirect</SelectItem>
-                <SelectItem value="deny">deny</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {ruleForm.type === "redirect" && (
-            <>
-              <div>
-                <Input
-                  placeholder="code (301/302/307/308)"
-                  value={ruleForm.redirectCode}
-                  onChange={(e) => setRuleForm({ ...ruleForm, redirectCode: e.target.value })}
-                  className="w-44"
-                  aria-label="redirect code"
-                />
-                <FieldError msg={errors.redirect_code} />
-              </div>
-              <div>
-                <Input
-                  placeholder="destination (e.g. /new)"
-                  value={ruleForm.redirectDestination}
-                  onChange={(e) => setRuleForm({ ...ruleForm, redirectDestination: e.target.value })}
-                  className="w-48"
-                  aria-label="redirect destination"
-                />
-                <FieldError msg={errors.redirect_destination} />
-              </div>
-            </>
-          )}
-          {ruleForm.type === "deny" && (
-            <div>
-              <Input
-                placeholder="status (403/404)"
-                value={ruleForm.denyStatus}
-                onChange={(e) => setRuleForm({ ...ruleForm, denyStatus: e.target.value })}
-                className="w-32"
-                aria-label="deny status"
-              />
-              <FieldError msg={errors.deny_status} />
-            </div>
-          )}
-          <div>
-            <Input
-              placeholder="condition val (optional, e.g. path_beg /old)"
-              value={ruleForm.condVal}
-              onChange={(e) => setRuleForm({ ...ruleForm, condVal: e.target.value })}
-              className="w-56"
-              aria-label="condition value"
-            />
-          </div>
-          <Button onClick={addRule} disabled={pending || !effectiveName}>
-            {pending ? "Working…" : "Add rule"}
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Rules evaluate top-down; new rules append last. Transactional +
-          recorded in history.
         </p>
       </div>
 

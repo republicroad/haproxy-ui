@@ -66,25 +66,58 @@ function LatencyBars({ history }: { history: HealthPoint[] }) {
   )
 }
 
+type SmtpSettingsUi = {
+  host: string
+  port: number
+  secure: boolean
+  username: string
+  password: string
+  fromAddr: string
+  toAddrs: string
+  enabled: boolean
+  hasPassword?: boolean
+}
+
 function AlertSettingsModal({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState("")
   const [enabled, setEnabled] = useState(false)
+  const [smtp, setSmtp] = useState<SmtpSettingsUi>({
+    host: "",
+    port: 587,
+    secure: false,
+    username: "",
+    password: "",
+    fromAddr: "",
+    toAddrs: "",
+    enabled: false,
+  })
   const [loaded, setLoaded] = useState(false)
   const [pending, setPending] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
     fetch("/api/alerts/settings")
-      .then((r) => (r.ok ? r.json() : { webhookUrl: "", enabled: false }))
-      .then((j: { webhookUrl: string; enabled: boolean }) => {
-        setUrl(j.webhookUrl)
-        setEnabled(j.enabled)
-        setLoaded(true)
-      })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (
+          j: {
+            webhookUrl: string
+            enabled: boolean
+            smtp?: SmtpSettingsUi
+          } | null,
+        ) => {
+          if (j) {
+            setUrl(j.webhookUrl)
+            setEnabled(j.enabled)
+            if (j.smtp) setSmtp({ ...smtp, ...j.smtp })
+          }
+          setLoaded(true)
+        },
+      )
       .catch(() => setLoaded(true))
   }, [])
 
-  const save = async (testOnly?: boolean) => {
+  const save = async (testOnly?: "webhook" | "smtp") => {
     setPending(true)
     setMsg(null)
     try {
@@ -92,22 +125,43 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
         const res = await fetch("/api/alerts/test", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ webhookUrl: url }),
+          body: JSON.stringify(
+            testOnly === "smtp"
+              ? { channel: "smtp" }
+              : { channel: "webhook", webhookUrl: url },
+          ),
         })
         const j = await res.json().catch(() => ({}))
         setMsg(
-          j.ok ? "Test payload sent." : `Test failed: ${j.error ?? res.status}`,
+          j.ok
+            ? testOnly === "smtp"
+              ? "Test email sent."
+              : "Test payload sent."
+            : `Test failed: ${j.error ?? res.status}`,
         )
-      } else {
-        const res = await fetch("/api/alerts/settings", {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ webhookUrl: url, enabled }),
-        })
-        const j = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(j.error ?? "save failed")
-        setMsg("Settings saved.")
+        return
       }
+      const res = await fetch("/api/alerts/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          webhookUrl: url,
+          enabled,
+          smtp: {
+            host: smtp.host,
+            port: smtp.port,
+            secure: smtp.secure,
+            username: smtp.username,
+            password: smtp.password,
+            fromAddr: smtp.fromAddr,
+            toAddrs: smtp.toAddrs,
+            enabled: smtp.enabled,
+          },
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? "save failed")
+      setMsg("Settings saved.")
     } catch (e) {
       setMsg((e as Error).message)
     } finally {
@@ -115,12 +169,15 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const sm = (patch: Partial<SmtpSettingsUi>) => setSmtp({ ...smtp, ...patch })
+
   return (
     <Modal open onClose={onClose} title="Alert notifications">
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          A webhook is POSTed when a node transitions down or recovers
-          (5-minute cooldown). Works with Slack/Discord/generic JSON hooks.
+          Webhooks and/or emails are sent when a node transitions down or
+          recovers (5-minute cooldown). Works with Slack/Discord/generic JSON
+          hooks and any SMTP server.
         </p>
         <div>
           <Label className="mb-1 block text-xs text-muted-foreground">
@@ -138,8 +195,86 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
             checked={enabled}
             onCheckedChange={(v) => setEnabled(v === true)}
           />
-          Enable alerts
+          Enable webhook alerts
         </label>
+
+        <div className="mt-1 border-t border-border pt-3">
+          <label className="mb-2 flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={smtp.enabled}
+              onCheckedChange={(v) => sm({ enabled: v === true })}
+            />
+            Enable email alerts (SMTP)
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">SMTP host</Label>
+              <Input
+                value={smtp.host}
+                onChange={(e) => sm({ host: e.target.value })}
+                placeholder="smtp.example.com"
+                aria-label="smtp host"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">Port</Label>
+              <Input
+                type="number"
+                value={smtp.port}
+                onChange={(e) => sm({ port: Number(e.target.value) || 587 })}
+                aria-label="smtp port"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">Username</Label>
+              <Input
+                value={smtp.username}
+                onChange={(e) => sm({ username: e.target.value })}
+                aria-label="smtp username"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">
+                Password{smtp.hasPassword ? " (saved)" : ""}
+              </Label>
+              <Input
+                type="password"
+                value={smtp.password}
+                onChange={(e) => sm({ password: e.target.value })}
+                placeholder={smtp.hasPassword ? "••••••••" : ""}
+                aria-label="smtp password"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">From</Label>
+              <Input
+                value={smtp.fromAddr}
+                onChange={(e) => sm({ fromAddr: e.target.value })}
+                placeholder="alerts@example.com"
+                aria-label="smtp from"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">
+                Recipients (comma-separated)
+              </Label>
+              <Input
+                value={smtp.toAddrs}
+                onChange={(e) => sm({ toAddrs: e.target.value })}
+                placeholder="oncall@example.com, ops@example.com"
+                aria-label="smtp recipients"
+              />
+            </div>
+          </div>
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={smtp.secure}
+              onCheckedChange={(v) => sm({ secure: v === true })}
+            />
+            Implicit TLS (port 465); otherwise STARTTLS when offered
+          </label>
+        </div>
+
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onClose}>
@@ -149,13 +284,21 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
             variant="outline"
             size="sm"
             disabled={pending || !loaded || !url}
-            onClick={() => save(true)}
+            onClick={() => save("webhook")}
           >
-            Send test
+            Test webhook
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pending || !loaded || !smtp.enabled || !smtp.host}
+            onClick={() => save("smtp")}
+          >
+            Test email
           </Button>
           <Button
             size="sm"
-            disabled={pending || !loaded || (enabled && !url)}
+            disabled={pending || !loaded || (enabled && !url && !smtp.enabled)}
             onClick={() => save()}
           >
             {pending ? "Saving…" : "Save"}

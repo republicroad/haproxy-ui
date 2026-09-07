@@ -1,18 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { getAlertSettings, setAlertSettings } from "#/lib/db"
+import { getAlertSettings, getSmtpSettings, setAlertSettings, setSmtpSettings } from "#/lib/db"
 import { z } from "zod"
 import { fieldErrors } from "#/lib/schemas"
 
 const settingsSchema = z.object({
-  webhookUrl: z.string().trim().url({ protocol: /^https?$/ }).or(z.literal("")),
-  enabled: z.boolean(),
+  webhookUrl: z.string().trim().url({ protocol: /^https?$/ }).or(z.literal("")).default(""),
+  enabled: z.boolean().default(false),
+  smtp: z
+    .object({
+      host: z.string().trim().max(255).default(""),
+      port: z.coerce.number().int().min(1).max(65535).default(587),
+      secure: z.boolean().default(false),
+      username: z.string().trim().max(255).default(""),
+      password: z.string().max(255).default(""),
+      fromAddr: z.string().trim().max(255).default(""),
+      toAddrs: z.string().trim().max(1000).default(""),
+      enabled: z.boolean().default(false),
+    })
+    .optional(),
 })
 
 export const Route = createFileRoute("/api/alerts/settings")({
   server: {
     handlers: {
       GET: async () => {
-        return Response.json(getAlertSettings())
+        const s = getSmtpSettings()
+        return Response.json({
+          ...getAlertSettings(),
+          smtp: {
+            ...s,
+            // never send the stored password back to the browser
+            password: "",
+            hasPassword: Boolean(s.password),
+            toAddrs: s.toAddrs.join(","),
+          },
+        })
       },
       PUT: async ({ request }) => {
         let body: unknown
@@ -28,14 +50,32 @@ export const Route = createFileRoute("/api/alerts/settings")({
             { status: 400 },
           )
         }
-        if (parsed.data.enabled && !parsed.data.webhookUrl) {
+        const data = parsed.data
+        if (data.enabled && !data.webhookUrl && !data.smtp?.enabled) {
           return Response.json(
             { error: "webhookUrl required when enabled" },
             { status: 400 },
           )
         }
-        setAlertSettings(parsed.data)
-        return Response.json(getAlertSettings())
+        if (data.smtp) {
+          const current = getSmtpSettings()
+          setSmtpSettings({
+            host: data.smtp.host,
+            port: data.smtp.port,
+            secure: data.smtp.secure,
+            username: data.smtp.username,
+            // empty password keeps the stored one (masked input round-trips)
+            password: data.smtp.password === "" ? current.password : data.smtp.password,
+            fromAddr: data.smtp.fromAddr,
+            toAddrs: data.smtp.toAddrs
+              .split(",")
+              .map((a) => a.trim())
+              .filter(Boolean),
+            enabled: data.smtp.enabled,
+          })
+        }
+        setAlertSettings({ webhookUrl: data.webhookUrl, enabled: data.enabled })
+        return Response.json({ ok: true })
       },
     },
   },

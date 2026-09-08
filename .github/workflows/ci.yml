@@ -90,10 +90,12 @@ jobs:
 
       - name: Download dataplaneapi binary
         run: |
-          mkdir -p haproxy/v3bin
+          mkdir -p haproxy/v3bin /tmp/dpapi
           curl -fsSL "https://github.com/haproxytech/dataplaneapi/releases/download/${DPAPI_VERSION}/dataplaneapi_${DPAPI_VERSION#v}_linux_x86_64.tar.gz" -o /tmp/dpapi.tgz
-          tar -xzf /tmp/dpapi.tgz -C /tmp
-          find /tmp -name dataplaneapi -type f -exec cp {} haproxy/v3bin/dataplaneapi \;
+          tar -xzf /tmp/dpapi.tgz -C /tmp/dpapi
+          BIN="$(find /tmp/dpapi -name dataplaneapi -type f | head -1)"
+          test -n "$BIN"
+          cp "$BIN" haproxy/v3bin/dataplaneapi
           chmod +x haproxy/v3bin/dataplaneapi
 
       - name: Build and start HAProxy + dataplaneapi container

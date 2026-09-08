@@ -94,9 +94,10 @@ const run = async () => {
 
   // ---- rules: switching rule + health check + rate limit preset ----
   tx = await newTx()
+  // real dataplaneapi rejects collection POSTs (405) — create at an index
   r = await dp(
     "POST",
-    `services/haproxy/configuration/frontends/fe_int/backend_switching_rules?transaction_id=${tx}`,
+    `services/haproxy/configuration/frontends/fe_int/backend_switching_rules/0?transaction_id=${tx}`,
     { name: "be_int", cond: "if", cond_test: "{ path_beg /api }" },
   )
   console.log("switching rule:", r.status, JSON.stringify(await j(r)))
@@ -105,7 +106,7 @@ const run = async () => {
   tx = await newTx()
   r = await dp(
     "POST",
-    `services/haproxy/configuration/backends/be_int/http_checks?transaction_id=${tx}`,
+    `services/haproxy/configuration/backends/be_int/http_checks/0?transaction_id=${tx}`,
     { type: "status", value: "200" },
   )
   console.log("http check:", r.status, JSON.stringify(await j(r)))
@@ -127,13 +128,13 @@ const run = async () => {
   console.log("stick_table:", r.status)
   r = await dp(
     "POST",
-    `services/haproxy/configuration/backends/be_int/http_request_rules?transaction_id=${tx}`,
+    `services/haproxy/configuration/backends/be_int/http_request_rules/0?transaction_id=${tx}`,
     { type: "track-sc0", var_name: "src" },
   )
   console.log("track rule:", r.status)
   r = await dp(
     "POST",
-    `services/haproxy/configuration/backends/be_int/http_request_rules?transaction_id=${tx}`,
+    `services/haproxy/configuration/backends/be_int/http_request_rules/1?transaction_id=${tx}`,
     {
       type: "deny",
       deny_status: 429,

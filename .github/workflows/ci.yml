@@ -76,7 +76,7 @@ jobs:
     # against it through the production server.
     runs-on: ubuntu-latest
     env:
-      DPAPI_VERSION: v3.4.0
+      DPAPI_VERSION: v3.4.3
     steps:
       - uses: actions/checkout@v7
 
@@ -91,7 +91,7 @@ jobs:
       - name: Download dataplaneapi binary
         run: |
           mkdir -p haproxy/v3bin
-          curl -fsSL "https://github.com/haproxytech/dataplaneapi/releases/download/${DPAPI_VERSION}/dataplaneapi_${DPAPI_VERSION#v}_linux_amd64.tar.gz" -o /tmp/dpapi.tgz
+          curl -fsSL "https://github.com/haproxytech/dataplaneapi/releases/download/${DPAPI_VERSION}/dataplaneapi_${DPAPI_VERSION#v}_linux_x86_64.tar.gz" -o /tmp/dpapi.tgz
           tar -xzf /tmp/dpapi.tgz -C /tmp
           find /tmp -name dataplaneapi -type f -exec cp {} haproxy/v3bin/dataplaneapi \;
           chmod +x haproxy/v3bin/dataplaneapi

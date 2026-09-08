@@ -8,5 +8,4 @@ dist
 opencode.json
 opencode.jsonc
 *.md
-scripts/
 .reui/

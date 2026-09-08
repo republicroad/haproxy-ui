@@ -275,6 +275,12 @@ const server = createServer((req, res) => {
         list.push(json)
         return send(res, 201, json)
       }
+      if (method === "PUT" && ruleMatch[4] !== undefined) {
+        const i = Number(ruleMatch[4])
+        if (i > list.length) return send(res, 400, { code: 400, message: "index out of range" })
+        list.splice(i, i === list.length ? 0 : 1, json)
+        return send(res, 200, json)
+      }
       if (method === "DELETE" && ruleMatch[4] !== undefined) {
         list.splice(Number(ruleMatch[4]), 1)
         return send(res, 202, {})

@@ -282,10 +282,15 @@ export function RulesTab({
       await withTransaction(
         nodeId,
         async (tx) => {
-          // real dataplaneapi: rule subresources are indexed POSTs, but
-          // http_checks uses the collection endpoint
-          const path = collectionPost ? sub(name) : `${sub(name)}/${rows?.length ?? 0}`
-          await dpPost(nodeId, path, body, tx)
+          // real dataplaneapi quirks: most rule subresources are indexed
+          // POSTs; http_checks are upserted via indexed PUT
+          if (name === "http_checks") {
+            await dpPut(nodeId, `${sub(name)}/${rows?.length ?? 0}`, body, tx)
+          } else if (collectionPost) {
+            await dpPost(nodeId, sub(name), body, tx)
+          } else {
+            await dpPost(nodeId, `${sub(name)}/${rows?.length ?? 0}`, body, tx)
+          }
         },
         {
           kind: "create",
@@ -893,17 +898,16 @@ export function RulesTab({
                       }
                       setChkErrors({})
                       // dataplaneapi models an expectation as
-                      // {type:"expect", value:"<kind> <value>"} and creates
-                      // http_checks via the collection endpoint (no index)
+                      // {type:"expect", value:"<kind> <value>"}; http_checks
+                      // are upserted via indexed PUT
                       void addIndexed(
                         "http_checks",
-                        undefined,
+                        checkQ.data,
                         { type: "expect", value: `${parsed.data.type} ${parsed.data.value}` },
                         {
                           resource: "check",
                           target: `${parsed.data.type} ${parsed.data.value}`,
                         },
-                        true,
                       )
                     }}
                     disabled={pending || !effectiveName}

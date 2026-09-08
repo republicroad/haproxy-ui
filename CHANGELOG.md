@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.0] - 2026-09-09
+
+Tooling and quality release: real-container CI integration, log query
+indexes, and the i18n evaluation.
+
+### Added
+- **CI integration job**: builds the bundled HAProxy 3.3 +
+  dataplaneapi image in GitHub Actions, boots the production server
+  against it and runs the full API integration suite (itest) on every
+  push/PR — real-container coverage no longer depends on local setup.
+- **i18n evaluation** (docs/i18n-evaluation.md): recommendation for a
+  lightweight zh-CN dictionary over react-i18next, with a phased
+  effort estimate.
+
+### Changed
+- Composite indexes on log_records (node_id, frontend, ts) and
+  (node_id, client_ip, ts) so the aggregation queries stay fast as
+  retention grows.
+
+[2.3.0]: https://github.com/republicroad/haproxy-ui/releases/tag/v2.3.0
 ## [2.2.0] - 2026-09-09
 
 RBAC-completion and audit release: OIDC group-claim mapping, CSV audit

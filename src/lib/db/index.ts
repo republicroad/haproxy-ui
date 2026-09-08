@@ -137,6 +137,9 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_logs_ts ON log_records(ts);
   CREATE INDEX IF NOT EXISTS idx_logs_node_ts ON log_records(node_id, ts);
+  -- aggregation helpers: per-frontend breakdown and top-client groupings
+  CREATE INDEX IF NOT EXISTS idx_logs_node_fe_ts ON log_records(node_id, frontend, ts);
+  CREATE INDEX IF NOT EXISTS idx_logs_node_ip_ts ON log_records(node_id, client_ip, ts);
   CREATE TABLE IF NOT EXISTS user_sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,

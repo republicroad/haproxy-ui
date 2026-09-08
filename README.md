@@ -1,4 +1,4 @@
-# [![v2.2.0](https://img.shields.io/badge/version-2.2.0-blue)](CHANGELOG.md)
+# [![v2.3.0](https://img.shields.io/badge/version-2.3.0-blue)](CHANGELOG.md)
 
 # HAProxy UI
 

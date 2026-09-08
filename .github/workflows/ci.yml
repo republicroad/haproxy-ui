@@ -69,3 +69,56 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 7
+
+  integration:
+    # Real-container verification: builds the bundled HAProxy +
+    # dataplaneapi image and runs the API integration suite (itest)
+    # against it through the production server.
+    runs-on: ubuntu-latest
+    env:
+      DPAPI_VERSION: v3.4.0
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dataplaneapi binary
+        run: |
+          mkdir -p haproxy/v3bin
+          curl -fsSL "https://github.com/haproxytech/dataplaneapi/releases/download/${DPAPI_VERSION}/dataplaneapi_${DPAPI_VERSION#v}_linux_amd64.tar.gz" -o /tmp/dpapi.tgz
+          tar -xzf /tmp/dpapi.tgz -C /tmp
+          find /tmp -name dataplaneapi -type f -exec cp {} haproxy/v3bin/dataplaneapi \;
+          chmod +x haproxy/v3bin/dataplaneapi
+
+      - name: Build and start HAProxy + dataplaneapi container
+        run: |
+          docker build -t haproxy-dp -f haproxy/Containerfile haproxy/
+          docker run -d --name dp1 -p 5555:5555 haproxy-dp
+          for i in $(seq 1 30); do
+            if curl -sf -u admin:admin http://localhost:5555/v3/services/haproxy/runtime/info > /dev/null; then
+              echo "dataplaneapi ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "dataplaneapi did not become ready"; docker logs dp1; exit 1
+
+      - name: Start production server
+        run: |
+          npm run build
+          HAPROXY_UI_DB=/tmp/itest.db node scripts/prod-server.mjs &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/auth/status > /dev/null; then
+              echo "app ready"; exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: API integration suite
+        run: DP_PORT=5555 npm run itest

@@ -521,10 +521,14 @@ export function RulesTab({
     backend: r.name,
     condition: `${r.cond} ${r.cond_test ?? ""}`,
   }))
-  const checkRows = (checkQ.data ?? []).map((r) => ({
-    type: r.type,
-    value: r.value ?? "",
-  }))
+  const checkRows = (checkQ.data ?? []).map((r) => {
+    // real dataplaneapi stores expects as {type:"expect", value:"status 200"}
+    const [kind, ...rest] = (r.value ?? "").split(" ")
+    return {
+      type: r.type === "expect" ? kind : r.type,
+      value: r.type === "expect" ? rest.join(" ") : (r.value ?? ""),
+    }
+  })
 
   // ---------------- TCP rules form ----------------
 
@@ -883,10 +887,16 @@ export function RulesTab({
                         return
                       }
                       setChkErrors({})
-                      void addIndexed("http_checks", checkQ.data, parsed.data, {
-                        resource: "check",
-                        target: `${parsed.data.type} ${parsed.data.value}`,
-                      })
+                      // dataplaneapi models an expectation as {type:"expect", value:"<kind> <value>"}
+                      void addIndexed(
+                        "http_checks",
+                        checkQ.data,
+                        { type: "expect", value: `${parsed.data.type} ${parsed.data.value}` },
+                        {
+                          resource: "check",
+                          target: `${parsed.data.type} ${parsed.data.value}`,
+                        },
+                      )
                     }}
                     disabled={pending || !effectiveName}
                   >

@@ -100,16 +100,16 @@ const run = async () => {
     `services/haproxy/configuration/frontends/fe_int/backend_switching_rules/0?transaction_id=${tx}`,
     { name: "be_int", cond: "if", cond_test: "{ path_beg /api }" },
   )
-  console.log("switching rule:", r.status, JSON.stringify(await j(r)))
+  console.log("switching rule:", r.status, r.ok ? "" : await r.clone().text())
   await commit(tx)
 
   tx = await newTx()
   r = await dp(
     "POST",
     `services/haproxy/configuration/backends/be_int/http_checks/0?transaction_id=${tx}`,
-    { type: "status", value: "200" },
+    { type: "expect", value: "status 200" },
   )
-  console.log("http check:", r.status, JSON.stringify(await j(r)))
+  console.log("http check:", r.status, r.ok ? "" : await r.clone().text())
   await commit(tx)
 
   tx = await newTx()
@@ -117,6 +117,7 @@ const run = async () => {
     "PUT",
     `services/haproxy/configuration/backends/be_int?transaction_id=${tx}`,
     {
+      name: "be_int",
       stick_table: {
         type: "ip",
         size: "100k",
@@ -125,13 +126,13 @@ const run = async () => {
       },
     },
   )
-  console.log("stick_table:", r.status)
+  console.log("stick_table:", r.status, r.ok ? "" : await r.clone().text())
   r = await dp(
     "POST",
     `services/haproxy/configuration/backends/be_int/http_request_rules/0?transaction_id=${tx}`,
     { type: "track-sc0", var_name: "src" },
   )
-  console.log("track rule:", r.status)
+  console.log("track rule:", r.status, r.ok ? "" : await r.clone().text())
   r = await dp(
     "POST",
     `services/haproxy/configuration/backends/be_int/http_request_rules/1?transaction_id=${tx}`,
@@ -141,7 +142,7 @@ const run = async () => {
       http_rule_condition: { cond: "if", val: "{ src http_req_rate(10s) gt 50 }" },
     },
   )
-  console.log("deny rule:", r.status)
+  console.log("deny rule:", r.status, r.ok ? "" : await r.clone().text())
   await commit(tx)
 
   r = await dp("GET", "services/haproxy/configuration/frontends/fe_int/backend_switching_rules")
@@ -151,7 +152,7 @@ const run = async () => {
   r = await dp("GET", "services/haproxy/configuration/backends/be_int/http_checks")
   const checks = await j(r)
   console.log("http checks:", r.status, JSON.stringify(checks))
-  if (!JSON.stringify(checks).includes("status")) throw new Error("http check not persisted")
+  if (!JSON.stringify(checks).includes("expect")) throw new Error("http check not persisted")
   r = await dp("GET", "services/haproxy/configuration/backends/be_int/http_request_rules")
   const reqRules = await j(r)
   console.log("backend request rules:", r.status, JSON.stringify(reqRules))

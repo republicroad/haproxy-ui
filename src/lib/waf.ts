@@ -96,8 +96,33 @@ export const condForPreset = (presetId: string): string => aclNameForPreset(pres
 export const BOT_BLOCK_ACL = "bot_block"
 export const BOT_DETECT_ACL = "bot_detect"
 export const BOT_ALLOW_ACL = "bot_allow"
+export const IP_DENY_ACL = "ip_deny"
+export const IP_ALLOW_ACL = "ip_allow"
 export const condBotBlock = (): string => BOT_BLOCK_ACL
 export const condBotUnknown = (): string => `${BOT_DETECT_ACL} !${BOT_ALLOW_ACL}`
+export const condIpDeny = (): string => IP_DENY_ACL
+export const condIpAllowOnly = (): string => `!${IP_ALLOW_ACL}`
+
+/** Parse + validate a pasted CIDR/host list (one entry per line or space). */
+export function parseCidrList(raw: string): { valid: string[]; invalid: string[] } {
+  const tokens = raw
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+  const ipv4 = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/
+  const valid: string[] = []
+  const invalid: string[] = []
+  for (const t of tokens) {
+    if (ipv4.test(t) || /^[a-zA-Z0-9.-]+$/.test(t)) valid.push(t)
+    else invalid.push(t)
+  }
+  return { valid, invalid }
+}
+
+/** One ACL line holding the whole list (HAProxy ACL values are OR'ed). */
+export function cidrAclLine(aclName: string, cidrs: string[]): AclLine {
+  return { acl_name: aclName, criterion: "src", value: cidrs.join(" ") }
+}
 
 /** Sensible starting signature sets (editable in the UI). */
 export const DEFAULT_BLOCKED_BOTS = [
@@ -137,10 +162,12 @@ export function condTokens(cond: string | undefined): string[] {
   return (cond ?? "").trim().split(/\s+/).filter(Boolean)
 }
 
-/** True when the deny rule's condition references `aclName`. */
+/** True when the deny rule's condition references `aclName` (incl. `!name`). */
 export function denyReferences(rule: HttpRuleLike, aclName: string): boolean {
   if (rule.type !== "deny") return false
-  return condTokens(rule.http_rule_condition?.val).includes(aclName)
+  return condTokens(rule.http_rule_condition?.val).some(
+    (t) => t.replace(/^!/, "") === aclName,
+  )
 }
 
 /** First deny rule referencing `aclName`, or -1. */
@@ -168,7 +195,13 @@ export function signatureFromAclValue(value: string | undefined): string {
 
 // --- fleet sync helpers ---
 
-const BOT_ACL_NAMES = new Set([BOT_BLOCK_ACL, BOT_DETECT_ACL, BOT_ALLOW_ACL])
+const BOT_ACL_NAMES = new Set([
+  BOT_BLOCK_ACL,
+  BOT_DETECT_ACL,
+  BOT_ALLOW_ACL,
+  IP_DENY_ACL,
+  IP_ALLOW_ACL,
+])
 
 /** WAF presets, custom rules and bot lists all live under these names. */
 export function isProtectionAclName(name: string): boolean {

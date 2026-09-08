@@ -24,6 +24,8 @@ import {
   DEFAULT_BLOCKED_BOTS,
   DEFAULT_VERIFIED_BOTS,
   CUSTOM_ACL_PREFIX,
+  IP_ALLOW_ACL,
+  IP_DENY_ACL,
   WAF_PRESETS,
   aclIndicesByName,
   aclNameForPreset,
@@ -31,11 +33,16 @@ import {
   condBotBlock,
   condBotUnknown,
   condForPreset,
+  condIpAllowOnly,
+  condIpDeny,
+  cidrAclLine,
   findDenyIndex,
+  parseCidrList,
   signatureFromAclValue,
   type AclLine,
   type HttpRuleLike,
 } from "#/lib/waf"
+import { corazaAgentSnippet, haproxyFilterSnippet, spoeConfigSnippet } from "#/lib/spoe"
 
 type ParentType = "frontends" | "backends"
 
@@ -128,6 +135,7 @@ export function WafBotsTab({
     cond: string,
     seedAcls?: AclLine[],
     label = cond,
+    lookup = cond.split(/\s+/)[0].replace(/^!/, ""),
   ) => {
     setPending(true)
     try {
@@ -141,11 +149,11 @@ export function WafBotsTab({
                 if (lines.length > 0) await addAclLines(tx, lines)
               }
             }
-            if (findDenyIndex(rules, cond.split(/\s+/)[0]) < 0) {
+            if (findDenyIndex(rules, lookup) < 0) {
               await addDenyRule(tx, cond)
             }
           } else {
-            await removeDenyRule(tx, cond.split(/\s+/)[0])
+            await removeDenyRule(tx, lookup)
           }
         },
         {
@@ -162,6 +170,41 @@ export function WafBotsTab({
       toast.error(`Failed to ${enable ? "enable" : "disable"} ${label}`, {
         description: (e as Error).message,
       })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  /** Replace the whole CIDR list held by an ACL bundle in one transaction. */
+  const saveCidrList = async (aclName: string, raw: string, label: string) => {
+    const { valid, invalid } = parseCidrList(raw)
+    if (invalid.length > 0) {
+      toast.error(`Invalid entries ignored: ${invalid.slice(0, 5).join(", ")}`)
+    }
+    if (valid.length === 0) {
+      toast.error("Nothing to save — provide at least one CIDR or hostname")
+      return
+    }
+    setPending(true)
+    try {
+      await withTransaction(
+        nodeId,
+        async (tx) => {
+          await removeAclLines(tx, aclName)
+          await addAclLines(tx, [cidrAclLine(aclName, valid)])
+        },
+        {
+          kind: "update",
+          resource: "acl",
+          target: `${label} (${valid.length} entries)`,
+          parent: `${parentType.replace(/s$/, "")}/${effectiveName}`,
+          payload: { aclName, cidrs: valid },
+        },
+      )
+      toast.success(`${label} saved (${valid.length} entries)`)
+      reload()
+    } catch (e) {
+      toast.error(`Failed to save ${label}`, { description: (e as Error).message })
     } finally {
       setPending(false)
     }
@@ -578,6 +621,210 @@ export function WafBotsTab({
           />
         </div>
       </section>
+
+      {/* IP access control */}
+      <section className="space-y-2">
+        <div className="text-sm font-semibold">IP access control</div>
+        <p className="text-xs text-muted-foreground">
+          Source-IP lists as a single named ACL (one entry per line or space;
+          CIDRs like 10.0.0.0/8, plain IPs or hostnames). Country lists from
+          e.g. ipdeny.com can be pasted here for geo blocking.
+        </p>
+        <div className="overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">Protection</th>
+                <th className="px-3 py-2">Behaviour</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-border">
+                <td className="px-3 py-2 font-medium">Block listed sources</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Denies every source in the deny list below.
+                </td>
+                <td className="px-3 py-2">
+                  <Badge variant={findDenyIndex(rules, IP_DENY_ACL) >= 0 ? "success" : "secondary"}>
+                    {findDenyIndex(rules, IP_DENY_ACL) >= 0 ? "active" : "off"}
+                  </Badge>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <Button
+                    size="xs"
+                    variant={findDenyIndex(rules, IP_DENY_ACL) >= 0 ? "destructive" : "default"}
+                    disabled={pending}
+                    onClick={() => {
+                      const active = findDenyIndex(rules, IP_DENY_ACL) >= 0
+                      void toggleBundle(
+                        !active,
+                        [IP_DENY_ACL],
+                        condIpDeny(),
+                        undefined,
+                        "Block listed sources",
+                        IP_DENY_ACL,
+                      )
+                    }}
+                  >
+                    {findDenyIndex(rules, IP_DENY_ACL) >= 0 ? "Disable" : "Enable"}
+                  </Button>
+                </td>
+              </tr>
+              <tr className="border-t border-border">
+                <td className="px-3 py-2 font-medium">Allow only listed sources</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  Denies everything not in the allow list below.
+                </td>
+                <td className="px-3 py-2">
+                  <Badge variant={findDenyIndex(rules, IP_ALLOW_ACL) >= 0 ? "success" : "secondary"}>
+                    {findDenyIndex(rules, IP_ALLOW_ACL) >= 0 ? "active" : "off"}
+                  </Badge>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <Button
+                    size="xs"
+                    variant={findDenyIndex(rules, IP_ALLOW_ACL) >= 0 ? "destructive" : "default"}
+                    disabled={pending}
+                    onClick={() => {
+                      const active = findDenyIndex(rules, IP_ALLOW_ACL) >= 0
+                      void toggleBundle(
+                        !active,
+                        [IP_ALLOW_ACL],
+                        condIpAllowOnly(),
+                        undefined,
+                        "Allow only listed sources",
+                        IP_ALLOW_ACL,
+                      )
+                    }}
+                  >
+                    {findDenyIndex(rules, IP_ALLOW_ACL) >= 0 ? "Disable" : "Enable"}
+                  </Button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <CidrEditor
+            title="Deny list"
+            aclName={IP_DENY_ACL}
+            acls={acls}
+            pending={pending}
+            onSave={(raw) => void saveCidrList(IP_DENY_ACL, raw, "Deny list")}
+          />
+          <CidrEditor
+            title="Allow list"
+            aclName={IP_ALLOW_ACL}
+            acls={acls}
+            pending={pending}
+            onSave={(raw) => void saveCidrList(IP_ALLOW_ACL, raw, "Allow list")}
+          />
+        </div>
+      </section>
+
+      {/* Deep inspection (SPOE/Coraza) */}
+      <section className="space-y-2">
+        <div className="text-sm font-semibold">Deep inspection (SPOE / Coraza)</div>
+        <div className="rounded-lg border border-border p-3">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Community HAProxy offloads deep WAF inspection to a Coraza agent
+            over the Stream Processing Offload Engine. Review the generated
+            snippets, adapt paths and addresses, then apply them on the host
+            (they are deliberately <em>not</em> pushed by the UI).
+          </p>
+          <SnippetBlock
+            title={`haproxy.cfg — frontend ${effectiveName}`}
+            content={haproxyFilterSnippet({
+              frontend: effectiveName,
+              agentAddress: "127.0.0.1:9000",
+              spoeConfigPath: "/etc/haproxy/spoe-coraza.conf",
+            })}
+          />
+          <SnippetBlock
+            title="spoe-coraza.conf"
+            content={spoeConfigSnippet({
+              frontend: effectiveName,
+              agentAddress: "127.0.0.1:9000",
+              spoeConfigPath: "/etc/haproxy/spoe-coraza.conf",
+            })}
+          />
+          <SnippetBlock title="coraza-spoa config.yaml" content={corazaAgentSnippet()} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function SnippetBlock({ title, content }: { title: string; content: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="mt-2">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{title}</span>
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => {
+            navigator.clipboard.writeText(content).then(() => {
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1500)
+            })
+          }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <pre className="max-h-52 overflow-auto rounded-md border border-border bg-muted/40 p-2 font-mono text-[11px] leading-4">
+        {content}
+      </pre>
+    </div>
+  )
+}
+function CidrEditor({
+  title,
+  aclName,
+  acls,
+  pending,
+  onSave,
+}: {
+  title: string
+  aclName: string
+  acls: AclLine[]
+  pending: boolean
+  onSave: (raw: string) => void
+}) {
+  const serverValue = acls
+    .filter((a) => a.acl_name === aclName)
+    .map((a) => a.value ?? "")
+    .join(" ")
+  const [draft, setDraft] = useState<string | null>(null)
+  // keep the editor in sync with the server until the user starts typing
+  const value = draft ?? serverValue
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="mb-2 text-sm font-medium">{title}</div>
+      <textarea
+        className="h-32 w-full rounded-md border border-border bg-background p-2 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
+        value={value}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={"10.0.0.0/8\n192.168.1.1\n203.0.113.0/24"}
+        aria-label={title}
+      />
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {value.split(/[\s,]+/).filter(Boolean).length} entries
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || draft === null}
+          onClick={() => onSave(value)}
+        >
+          Save list
+        </Button>
+      </div>
     </div>
   )
 }

@@ -43,6 +43,7 @@ import { Route as ApiAuthOidcCallbackRouteImport } from './routes/api/auth/oidc/
 import { Route as ApiAuthOidcStartRouteImport } from './routes/api/auth/oidc/start'
 import { Route as ApiAuthOidcStatusRouteImport } from './routes/api/auth/oidc/status'
 import { Route as ApiDpNodeIdSplatRouteImport } from './routes/api/dp/$nodeId/$'
+import { Route as ApiNodesIdAdvisorRouteImport } from './routes/api/nodes/$id/advisor'
 import { Route as ApiNodesIdCertsRouteImport } from './routes/api/nodes/$id/certs'
 import { Route as ApiNodesIdChangesRouteImport } from './routes/api/nodes/$id/changes'
 import { Route as ApiNodesIdConfigRouteImport } from './routes/api/nodes/$id/config'
@@ -222,6 +223,11 @@ const ApiDpNodeIdSplatRoute = ApiDpNodeIdSplatRouteImport.update({
   path: '/api/dp/$nodeId/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNodesIdAdvisorRoute = ApiNodesIdAdvisorRouteImport.update({
+  id: '/advisor',
+  path: '/advisor',
+  getParentRoute: () => ApiNodesIdRoute,
+} as any)
 const ApiNodesIdCertsRoute = ApiNodesIdCertsRouteImport.update({
   id: '/certs',
   path: '/certs',
@@ -300,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
   '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
+  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
@@ -343,6 +350,7 @@ export interface FileRoutesByTo {
   '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
   '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
+  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
   '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
+  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRoute
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/api/auth/oidc/start'
     | '/api/auth/oidc/status'
     | '/api/dp/$nodeId/$'
+    | '/api/nodes/$id/advisor'
     | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
@@ -477,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/auth/oidc/start'
     | '/api/auth/oidc/status'
     | '/api/dp/$nodeId/$'
+    | '/api/nodes/$id/advisor'
     | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
@@ -521,6 +532,7 @@ export interface FileRouteTypes {
     | '/api/auth/oidc/start'
     | '/api/auth/oidc/status'
     | '/api/dp/$nodeId/$'
+    | '/api/nodes/$id/advisor'
     | '/api/nodes/$id/certs'
     | '/api/nodes/$id/changes'
     | '/api/nodes/$id/config'
@@ -798,6 +810,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDpNodeIdSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/nodes/$id/advisor': {
+      id: '/api/nodes/$id/advisor'
+      path: '/advisor'
+      fullPath: '/api/nodes/$id/advisor'
+      preLoaderRoute: typeof ApiNodesIdAdvisorRouteImport
+      parentRoute: typeof ApiNodesIdRoute
+    }
     '/api/nodes/$id/certs': {
       id: '/api/nodes/$id/certs'
       path: '/certs'
@@ -906,6 +925,7 @@ const ApiNodesIdChangesRouteWithChildren =
   ApiNodesIdChangesRoute._addFileChildren(ApiNodesIdChangesRouteChildren)
 
 interface ApiNodesIdRouteChildren {
+  ApiNodesIdAdvisorRoute: typeof ApiNodesIdAdvisorRoute
   ApiNodesIdCertsRoute: typeof ApiNodesIdCertsRoute
   ApiNodesIdChangesRoute: typeof ApiNodesIdChangesRouteWithChildren
   ApiNodesIdConfigRoute: typeof ApiNodesIdConfigRoute
@@ -915,6 +935,7 @@ interface ApiNodesIdRouteChildren {
 }
 
 const ApiNodesIdRouteChildren: ApiNodesIdRouteChildren = {
+  ApiNodesIdAdvisorRoute: ApiNodesIdAdvisorRoute,
   ApiNodesIdCertsRoute: ApiNodesIdCertsRoute,
   ApiNodesIdChangesRoute: ApiNodesIdChangesRouteWithChildren,
   ApiNodesIdConfigRoute: ApiNodesIdConfigRoute,
@@ -1010,3 +1031,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

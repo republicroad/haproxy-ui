@@ -19,6 +19,7 @@ import type { NodeRow, Frontend, Backend } from "#/lib/types"
 import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
 import { SyncModal } from "#/components/SyncModal"
 import { UpgradeModal } from "#/components/UpgradeModal"
+import { AdvisorPanel } from "#/components/AdvisorPanel"
 import { reviewChangesEnabled, setReviewChangesEnabled } from "#/components/TransactionReviewGate"
 import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
 import { RulesTab } from "#/components/tabs/RulesTab"
@@ -168,6 +169,7 @@ function NodeDetail() {
       {tab === "overview" && (
         <div className="space-y-4">
           <OverviewTab info={infoQ.data} loading={infoQ.isLoading} error={infoQ.error} />
+          <AdvisorPanel nodeId={id} />
           <TopologyView nodeId={id} onNavigate={(t) => setTab(t as Tab)} />
         </div>
       )}

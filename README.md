@@ -1,4 +1,4 @@
-# [![v1.2.0](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
+# [![v2.0.0](https://img.shields.io/badge/version-2.0.0-blue)](CHANGELOG.md)
 
 # HAProxy UI
 
@@ -93,7 +93,22 @@ Query/Table, `node:sqlite`, and zod.
   schemas generated from the same zod validators the API uses.
 - **Automation API** — admin-minted bearer tokens (hash-only storage,
   copy-once, instant revocation) let CI/curl scripts call the same
-  REST API the UI uses.
+  REST API the UI uses. Tokens carry a **scope**: full access,
+  read-only (no writes at all), or restricted to a single node group.
+- **Session management** — active sessions (user, IP, agent, last
+  activity) are listed and individually revocable; logout revokes only
+  the caller's session.
+- **Group admins** — admin-role users can be pinned to a node group and
+  then only manage nodes of that group (fleet-wide endpoints denied).
+- **IP access control** — bulk CIDR/hostname allow & deny lists per
+  frontend/backend ("block listed sources" / "allow only listed
+  sources"); paste country CIDR lists for geo blocking. Carried along
+  by multi-node sync.
+- **Config advisor** — static best-practice findings per node: broken
+  backend references, servers without health checks, track-sc rules
+  without stick-tables, orphaned objects, missing log targets.
+- **SPOE/Coraza generator** — ready-made snippets to attach a Coraza
+  (ModSecurity-compatible) deep-inspection agent to any frontend.
 - **Live updates** — server-sent events push config changes, node status
   flips and user changes to the UI; polling remains as a fallback.
 - **Retention & backups** — hourly maintenance loop purges change
@@ -149,6 +164,20 @@ docker run -p 3000:3000 -v haproxy-ui-data:/app/data \
   -e HAPROXY_UI_USER=admin -e HAPROXY_UI_PASS=secret \
   -e HAPROXY_UI_KEY=change-me haproxy-ui
 ```
+
+### Backing up the UI database
+
+The UI is stateful (SQLite). Three layers, pick what fits:
+
+1. **One-click snapshots** — Users page (admin) → *Database backups* →
+   *Backup now*, or `POST /api/db/backup` (Bearer token). Files are
+   consistent, online `VACUUM INTO` copies written to
+   `HAPROXY_UI_BACKUP_DIR` (default `./backups`).
+2. **Restore** — stop the app, replace the DB file with the snapshot,
+   start again. Snapshots are plain SQLite files.
+3. **Continuous** — point [litestream](https://litestream.io) at the
+   same DB file (`databases: [{path: /app/data/haproxy-ui.db, ...}]`);
+   it replicates every WAL frame to S3/SSH/GCS in near-real-time.
 
 ## Development environment (HAProxy + Data Plane API)
 
@@ -209,7 +238,5 @@ Browser ─┬─ /api/nodes (CRUD, test, export/import, diff) ──> TanStack 
 
 ## Roadmap
 
-- SPOE/Coraza deep packet inspection as an optional WAF backend
-  (the built-in WAF stays HAProxy-native)
-- Multi-cluster RBAC (per-group admin scopes)
 - Anomaly alerts from ingested access logs (spike/5xx detection)
+- OIDC group-claim → node-group mapping for SSO-managed group admins

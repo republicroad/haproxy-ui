@@ -30,14 +30,15 @@ describe("deny rule condition matching", () => {
     expect(condTokens(undefined)).toEqual([])
   })
 
-  it("detects references on deny rules only", () => {
+  it("detects references on deny rules only (negation-aware)", () => {
     const rules = [
       { type: "redirect", http_rule_condition: { cond: "if", val: "waf_sqli" } },
       { type: "deny", http_rule_condition: { cond: "if", val: "bot_detect !bot_allow" } },
     ]
     expect(denyReferences(rules[0], "waf_sqli")).toBe(false)
     expect(denyReferences(rules[1], "bot_detect")).toBe(true)
-    expect(denyReferences(rules[1], "bot_allow")).toBe(false) // negated token is "!bot_allow"
+    expect(denyReferences(rules[1], "bot_allow")).toBe(true) // negated but referenced
+    expect(denyReferences(rules[1], "ip_allow")).toBe(false)
     expect(findDenyIndex(rules, "bot_detect")).toBe(1)
     expect(findDenyIndex(rules, "waf_xss")).toBe(-1)
   })

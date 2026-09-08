@@ -4,6 +4,51 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.0.0] - 2026-09-08
+
+Fleet operations release: fine-grained token scopes, group admins,
+session management, database backups, IP access control, the config
+advisor and a SPOE/Coraza deep-inspection generator. First release
+published with container images and SBOMs.
+
+### Added
+
+#### Identity and access
+- **Token scopes** (all | readonly | group:<name>): read-only tokens
+  cannot perform any write; group tokens act like admins but only for
+  nodes in their group (fleet-wide endpoints denied)
+- **Group admins**: admin-role users pinned to a node group may only
+  manage nodes of that group; users/tokens/backup endpoints are
+  global-admin-only
+- **Session management**: sessions are registered with IP/agent and
+  last activity, listed on the Users page and individually revocable;
+  logout now revokes only the caller's session
+
+#### Operations
+- **Database backups**: online VACUUM INTO snapshots of the UI's
+  SQLite database via POST /api/db/backup or the Users-page card;
+  restore is a documented file swap (litestream guide included)
+- **IP access control** (WAF tab): bulk CIDR/hostname allow and deny
+  lists per section with one-click enforcement (block listed sources
+  / allow only listed sources); lists travel with multi-node sync
+- **Config advisor**: static best-practice analysis per node (broken
+  backend references, servers without health checks, duplicate server
+  addresses, track-sc without stick-table, orphaned backends, missing
+  log targets) with severity badges on the overview tab
+- **SPOE/Coraza generator**: copy-ready haproxy.cfg, spoe-coraza.conf
+  and coraza-spoa config snippets for deep WAF inspection
+
+### Changed
+- Release workflow publishes container images to GHCR (versioned +
+  latest) with SPDX SBOM and provenance attestation
+- Logout no longer invalidates every issued session, only the
+  caller's
+
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+
 ## [1.2.0] - 2026-09-07
 
 Safety and insight release: staged-change review before every config
@@ -199,6 +244,7 @@ the official Data Plane API (v2/v3).
   tokens with runtime revocation
 - CSRF same-origin enforcement and security response headers
 
-[1.2.0]: https://github.com/example/haproxy-ui/releases/tag/v1.2.0
-[1.1.0]: https://github.com/example/haproxy-ui/releases/tag/v1.1.0
-[1.0.0]: https://github.com/example/haproxy-ui/releases/tag/v1.0.0
+[2.0.0]: https://github.com/republicroad/haproxy-ui/releases/tag/v2.0.0
+[1.2.0]: https://github.com/republicroad/haproxy-ui/releases/tag/v1.2.0
+[1.1.0]: https://github.com/republicroad/haproxy-ui/releases/tag/v1.1.0
+[1.0.0]: https://github.com/republicroad/haproxy-ui/releases/tag/v1.0.0

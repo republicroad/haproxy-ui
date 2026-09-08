@@ -32,5 +32,9 @@ export default defineConfig({
       use: { storageState: "playwright/.auth/viewer.json" },
       dependencies: ["setup"],
     },
+    {
+      name: "sso",
+      testMatch: /oidc\.spec\.mjs/,
+    },
   ],
 })

@@ -3,7 +3,8 @@ import { proxyToNode } from "#/lib/dataplane/proxy"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 import type { Frontend, Backend, Server } from "#/lib/types"
 
-async function dpJson<T>(
+/** Proxy GET returning parsed JSON with `{ data: [...] }` envelopes unwrapped. */
+export async function dpJson<T>(
   nodeId: string,
   path: string,
 ): Promise<{ status: number; json: T | null; text: string }> {
@@ -19,10 +20,10 @@ async function dpJson<T>(
   } catch {
     json = null
   }
-  return { status: res.status, json: json as T | null, text }
+  return { status: res.status, json: unwrap(json as T | { data: T } | null), text }
 }
 
-function unwrap<T>(x: T | { data: T } | null): T | null {
+export function unwrap<T>(x: T | { data: T } | null): T | null {
   if (x && typeof x === "object" && !Array.isArray(x) && "data" in x) {
     return (x as { data: T }).data
   }

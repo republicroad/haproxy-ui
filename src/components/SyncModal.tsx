@@ -17,6 +17,12 @@ import {
 import { withTransaction, dpGet, dpPost, dpDelete } from "#/lib/dataplane/client"
 import { normalizeFrontends, normalizeBackends, serversOf } from "#/lib/normalize"
 import type { NodeRow, Frontend, Backend, Server } from "#/lib/types"
+import { isProtectionAclName, ruleReferencesProtection, type AclLine } from "#/lib/waf"
+
+type HttpRuleLike = {
+  type: string
+  http_rule_condition?: { cond: string; val?: string }
+}
 
 type SyncResult = {
   node: string
@@ -42,6 +48,7 @@ export function SyncModal({
   const [feSel, setFeSel] = useState<Set<string>>(new Set())
   const [beSel, setBeSel] = useState<Set<string>>(new Set())
   const [includeServers, setIncludeServers] = useState(true)
+  const [includeWaf, setIncludeWaf] = useState(false)
   const [targets, setTargets] = useState<Set<string>>(new Set())
   const [conflict, setConflict] = useState<"skip" | "overwrite">("skip")
   const [results, setResults] = useState<SyncResult[] | null>(null)
@@ -150,6 +157,64 @@ export function SyncModal({
                 }
                 await dpPost(t, "services/haproxy/configuration/frontends", f, tx)
                 r.created.push(`frontend/${f.name}`)
+              }
+
+              // WAF & bot bundles: append protection ACLs and deny rules that
+              // the target section doesn't have yet (keyed by full triple /
+              // condition string so repeated syncs are idempotent).
+              if (includeWaf) {
+                const sections = [
+                  ...fes.map((f) => ({
+                    type: "frontends" as const,
+                    name: f.name,
+                    exists: tFeNames.has(f.name),
+                  })),
+                  ...bes.map((b) => ({
+                    type: "backends" as const,
+                    name: b.name,
+                    exists: tBeNames.has(b.name),
+                  })),
+                ]
+                for (const sec of sections) {
+                  if (!sec.exists && conflict === "skip") continue
+                  const secBase = `services/haproxy/configuration/${sec.type}/${encodeURIComponent(sec.name)}`
+                  const [srcAcls, srcRules, tAcls, tRules] = await Promise.all([
+                    dpGet<AclLine[]>(nodeId, `${secBase}/acls`).catch(() => []),
+                    dpGet<HttpRuleLike[]>(nodeId, `${secBase}/http_request_rules`).catch(() => []),
+                    dpGet<AclLine[]>(t, `${secBase}/acls`).catch(() => []),
+                    dpGet<HttpRuleLike[]>(t, `${secBase}/http_request_rules`).catch(() => []),
+                  ])
+                  const tKeys = new Set(
+                    tAcls.map((a) => `${a.acl_name}|${a.criterion}|${a.value ?? ""}`),
+                  )
+                  let at = tAcls.length
+                  for (const a of srcAcls.filter((x) => isProtectionAclName(x.acl_name))) {
+                    const k = `${a.acl_name}|${a.criterion}|${a.value ?? ""}`
+                    if (tKeys.has(k)) {
+                      r.skipped.push(`waf/${sec.name}/${a.acl_name}`)
+                      continue
+                    }
+                    await dpPost(t, `${secBase}/acls/${at}`, a, tx)
+                    at++
+                    r.created.push(`waf/${sec.name}/${a.acl_name}`)
+                  }
+                  const tConds = new Set(
+                    tRules.filter(ruleReferencesProtection).map(
+                      (x) => x.http_rule_condition?.val ?? "",
+                    ),
+                  )
+                  let rat = tRules.length
+                  for (const rr of srcRules.filter(ruleReferencesProtection)) {
+                    const cond = rr.http_rule_condition?.val ?? ""
+                    if (tConds.has(cond)) {
+                      r.skipped.push(`waf/${sec.name}/deny:${cond}`)
+                      continue
+                    }
+                    await dpPost(t, `${secBase}/http_request_rules/${rat}`, rr, tx)
+                    rat++
+                    r.created.push(`waf/${sec.name}/deny:${cond}`)
+                  }
+                }
               }
             },
             [
@@ -280,6 +345,16 @@ export function SyncModal({
                 onCheckedChange={(v) => setIncludeServers(v === true)}
               />
               Include backend servers
+            </label>
+            <label className="mt-1 flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={includeWaf}
+                onCheckedChange={(v) => setIncludeWaf(v === true)}
+              />
+              Include WAF &amp; bot rules{" "}
+              <span className="text-xs text-muted-foreground">
+                (named ACL bundles + deny rules for the selected sections)
+              </span>
             </label>
           </div>
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "#/components/reui/badge"
 import { Button } from "#/components/ui/button"
+import { Checkbox } from "#/components/ui/checkbox"
 import { Alert } from "#/components/reui/alert"
 import {
   Stepper,
@@ -18,6 +19,7 @@ import type { NodeRow, Frontend, Backend } from "#/lib/types"
 import { NodeConfigImportExportButtons } from "#/components/ImportExportButtons"
 import { SyncModal } from "#/components/SyncModal"
 import { UpgradeModal } from "#/components/UpgradeModal"
+import { reviewChangesEnabled, setReviewChangesEnabled } from "#/components/TransactionReviewGate"
 import { AclsTab, MapsTab } from "#/components/AclMapsTabs"
 import { RulesTab } from "#/components/tabs/RulesTab"
 import { WafBotsTab } from "#/components/tabs/WafBotsTab"
@@ -52,6 +54,8 @@ function NodeDetail() {
   const [error, setError] = useState<string | null>(null)
   const [syncOpen, setSyncOpen] = useState(false)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [reviewChanges, setReviewChanges] = useState(false)
+  useEffect(() => setReviewChanges(reviewChangesEnabled()), [])
   useEffect(() => setMounted(true), [])
 
   const nodeQ = useQuery({ queryKey: ["node", id], queryFn: () => fetchNode(id) })
@@ -97,6 +101,18 @@ function NodeDetail() {
           <p className="text-muted-foreground">{nodeQ.data?.apiUrl}</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* no <label> wrapper: Base UI's hidden input would double-fire */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Checkbox
+              checked={reviewChanges}
+              onCheckedChange={(v) => {
+                setReviewChangesEnabled(v === true)
+                setReviewChanges(v === true)
+              }}
+              aria-label="review changes toggle"
+            />
+            <span>Review changes</span>
+          </div>
           <NodeConfigImportExportButtons nodeId={id} />
           <Button
             variant="outline"

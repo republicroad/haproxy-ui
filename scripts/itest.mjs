@@ -156,6 +156,23 @@ const run = async () => {
   console.log("backend request rules:", r.status, JSON.stringify(reqRules))
   if (!JSON.stringify(reqRules).includes("track-sc0")) throw new Error("track rule not persisted")
 
+  // observability endpoints
+  r = await fetch(`${BASE}/api/metrics`)
+  const metrics = await r.text()
+  console.log("metrics:", r.status, "content-type:", r.headers.get("content-type"))
+  if (r.status !== 200) throw new Error("metrics endpoint failed")
+  if (!metrics.includes("haproxy_ui_node_up") || !metrics.includes("haproxy_ui_log_records_last_5m")) {
+    throw new Error("metrics payload missing expected series")
+  }
+  r = await fetch(`${BASE}/api/logs?limit=10`)
+  const logs = await j(r)
+  console.log("logs:", r.status, Array.isArray(logs) ? `${logs.length} records` : JSON.stringify(logs))
+  if (r.status !== 200 || !Array.isArray(logs)) throw new Error("logs endpoint failed")
+  r = await fetch(`${BASE}/api/openapi`)
+  const spec = await j(r)
+  console.log("openapi:", r.status, spec?.openapi)
+  if (r.status !== 200 || spec?.openapi !== "3.1.0") throw new Error("openapi endpoint failed")
+
   await fetch(`${BASE}/api/nodes/${id}`, { method: "DELETE" })
   console.log("DONE")
 }

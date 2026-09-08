@@ -1,16 +1,20 @@
 import { join, resolve } from "node:path"
 import {
+  getAlertState,
   listNodes,
   deleteChangesBefore,
   insertMetricSamples,
   listLatestHealthChecks,
   purgeMetricSamples,
   purgeLogRecords,
+  setAlertState,
   trimHealthChecks,
 } from "#/lib/db"
 import { exportNodeConfig } from "#/lib/configExport"
 import { proxyToNode } from "#/lib/dataplane/proxy"
 import { LOG_KEEP_HOURS, startLogIngest } from "#/lib/logIngest"
+import { alertChannelsEnabled, notifyEmail, notifyWebhook } from "#/lib/alertChannels"
+import { expiringCerts, listCertsWithExpiry } from "#/lib/certCheck"
 import { writeFileSync, mkdirSync } from "node:fs"
 
 const INTERVAL_MS = 60 * 60 * 1000 // hourly
@@ -20,8 +24,11 @@ const METRICS_KEEP_HOURS = Number(process.env.HAPROXY_UI_METRICS_KEEP ?? 24 * 30
 const RETENTION_DAYS = Number(process.env.HAPROXY_UI_RETENTION_DAYS ?? 30)
 const HEALTH_KEEP = Number(process.env.HAPROXY_UI_HEALTH_KEEP ?? 720)
 const BACKUP_DIR = process.env.HAPROXY_UI_BACKUP_DIR
+const CERT_WARN_DAYS = Number(process.env.HAPROXY_UI_CERT_WARN_DAYS ?? 30)
+const CERT_CHECK_INTERVAL_MS = 24 * 3_600_000 // scan certificates daily
 
 let started = false
+let lastCertCheckTs = 0
 
 type NativeStat = {
   type?: string
@@ -82,6 +89,52 @@ async function sampleMetrics(): Promise<void> {
   purgeMetricSamples(METRICS_KEEP_HOURS)
 }
 
+/**
+ * Daily certificate expiry scan. Repeats an alert per certificate at most
+ * once a day (alert_state keyed by a synthetic cert: key) until the cert
+ * is renewed or removed.
+ */
+async function checkCertExpiry(upNodeIds: string[]): Promise<void> {
+  if (Date.now() - lastCertCheckTs < CERT_CHECK_INTERVAL_MS) return
+  lastCertCheckTs = Date.now()
+  if (!alertChannelsEnabled()) return
+  const nodeNames = new Map(listNodes().map((n) => [n.id, n.name]))
+  for (const nodeId of upNodeIds) {
+    let certs
+    try {
+      certs = await listCertsWithExpiry(nodeId)
+    } catch {
+      continue
+    }
+    for (const cert of expiringCerts(certs, CERT_WARN_DAYS)) {
+      const key = `cert:${nodeId}:${cert.name}`
+      const state = getAlertState(key)
+      if (Date.now() - state.lastAlertTs < CERT_CHECK_INTERVAL_MS) continue
+      const label = cert.expired
+        ? `expired ${-cert.daysLeft}d ago`
+        : `expires in ${cert.daysLeft}d`
+      const node = nodeNames.get(nodeId) ?? nodeId
+      const text = `HAProxy UI: certificate "${cert.name}" on ${node} ${label}`
+      const body = [
+        `Node: ${node}`,
+        `Certificate: ${cert.name}`,
+        `Subject: ${cert.subject ?? "?"}`,
+        `Status: ${label}`,
+        `Valid to: ${cert.validTo ?? "?"}`,
+      ].join("\n")
+      const delivered =
+        (await notifyWebhook(text, {
+          event: cert.expired ? "cert_expired" : "cert_expiring",
+          node: { id: nodeId, name: node },
+          certificate: cert.name,
+          daysLeft: cert.daysLeft,
+          ts: Date.now(),
+        })) || (await notifyEmail(text, body))
+      if (delivered) setAlertState(key, true, Date.now())
+    }
+  }
+}
+
 async function runOnce(): Promise<void> {
   // 1. trim per-node health check history
   trimHealthChecks(HEALTH_KEEP)
@@ -119,6 +172,12 @@ async function runOnce(): Promise<void> {
     }
     console.log(`[maintenance] wrote config backups to ${dir}`)
   }
+
+  // 4. daily certificate expiry scan (throttled internally, alert-gated)
+  const upIds = listLatestHealthChecks().filter((c) => c.ok).map((c) => c.nodeId)
+  await checkCertExpiry(upIds).catch((e) =>
+    console.error("[maintenance] cert expiry check failed:", e),
+  )
 }
 
 /** Idempotently start the maintenance loops (timers unref'd so they

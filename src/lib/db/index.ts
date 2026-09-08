@@ -912,6 +912,108 @@ export function purgeLogRecords(keepHours: number): number {
   return Number(r.changes)
 }
 
+/** Count a node's log records captured within the last `ms` (SQL-side, no rows). */
+export function countLogRecordsSince(nodeId: string, ms: number): number {
+  const row = db
+    .prepare("SELECT COUNT(*) AS c FROM log_records WHERE node_id = ? AND ts >= ?")
+    .get(nodeId, Date.now() - ms) as { c: number }
+  return row.c
+}
+
+// --- access-log aggregations (request explorer summary views) ---
+
+export type LogStats = {
+  total: number
+  ok2xx: number
+  err4xx: number
+  err5xx: number
+  avgTimeMs: number | null
+}
+
+function logWindow(nodeId: string, hours: number): { where: string; vals: (string | number)[] } {
+  return {
+    where: "node_id = ? AND ts >= ?",
+    vals: [nodeId, Date.now() - hours * 3_600_000],
+  }
+}
+
+export function logStats(nodeId: string, hours = 24): LogStats {
+  const { where, vals } = logWindow(nodeId, hours)
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END) AS ok2xx,
+              SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS err4xx,
+              SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS err5xx,
+              AVG(total_time_ms) AS avg_ms
+       FROM log_records WHERE ${where}`,
+    )
+    .get(...vals) as {
+    total: number
+    ok2xx: number | null
+    err4xx: number | null
+    err5xx: number | null
+    avg_ms: number | null
+  }
+  return {
+    total: row.total,
+    ok2xx: row.ok2xx ?? 0,
+    err4xx: row.err4xx ?? 0,
+    err5xx: row.err5xx ?? 0,
+    avgTimeMs: row.avg_ms == null ? null : Math.round(row.avg_ms),
+  }
+}
+
+export function topLogClients(
+  nodeId: string,
+  hours = 24,
+  limit = 10,
+): { clientIp: string; count: number }[] {
+  const { where, vals } = logWindow(nodeId, hours)
+  return (
+    db
+      .prepare(
+        `SELECT client_ip, COUNT(*) AS c FROM log_records WHERE ${where} AND client_ip IS NOT NULL GROUP BY client_ip ORDER BY c DESC LIMIT ${limit}`,
+      )
+      .all(...vals) as { client_ip: string; c: number }[]
+  ).map((r) => ({ clientIp: r.client_ip, count: r.c }))
+}
+
+/** Per-bucket request counts (bucketSeconds default 300 = 5 minutes). */
+export function logSeries(
+  nodeId: string,
+  hours = 24,
+  bucketSeconds = 300,
+): { ts: number; total: number; errors: number }[] {
+  const { where, vals } = logWindow(nodeId, hours)
+  const bucketMs = bucketSeconds * 1000
+  return (
+    db
+      .prepare(
+        `SELECT (ts / ${bucketMs}) * ${bucketMs} AS b, COUNT(*) AS total,
+                SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS errors
+         FROM log_records WHERE ${where} GROUP BY b ORDER BY b ASC`,
+      )
+      .all(...vals) as { b: number; total: number; errors: number }[]
+  ).map((r) => ({ ts: r.b, total: r.total, errors: r.errors }))
+}
+
+export function logFrontendBreakdown(
+  nodeId: string,
+  hours = 24,
+): { frontend: string; count: number; errors: number }[] {
+  const { where, vals } = logWindow(nodeId, hours)
+  return (
+    db
+      .prepare(
+        `SELECT COALESCE(frontend, '-') AS frontend, COUNT(*) AS c,
+                SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS errors
+         FROM log_records WHERE ${where} GROUP BY frontend ORDER BY c DESC`,
+      )
+      .all(...vals) as { frontend: string; c: number; errors: number }[]
+  ).map((r) => ({ frontend: r.frontend, count: r.c, errors: r.errors }))
+}
+
 // --- HAProxy binary upgrade orchestration ---
 
 export type UpgradeRun = {

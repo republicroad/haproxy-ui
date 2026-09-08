@@ -1,4 +1,4 @@
-# [![v1.1.0](https://img.shields.io/badge/version-1.1.0-blue)](CHANGELOG.md)
+# [![v1.2.0](https://img.shields.io/badge/version-1.2.0-blue)](CHANGELOG.md)
 
 # HAProxy UI
 
@@ -38,7 +38,9 @@ Query/Table, `node:sqlite`, and zod.
   sidecar daemons are involved.
 - **Access-log explorer** — optional UDP syslog receiver ingests
   HAProxy access logs (sampling + retention) with a filterable
-  request tab per node.
+  request tab per node, plus SQL-side aggregations: status-class
+  totals, per-5-minute request trend, top clients and per-frontend
+  breakdown.
 - **Runtime maps** — inspect and edit stick-table-driven map files
   (key/value CRUD, applies live without reload).
 - **Auth userlists & DNS resolvers** — manage HAProxy Basic-Auth
@@ -54,13 +56,17 @@ Query/Table, `node:sqlite`, and zod.
 - **Change history** — every configuration change is recorded with a raw
   config snapshot and the acting user; LCS-based diffs and one-click
   revert (create ⇄ delete) via a validated transaction.
+- **Review before apply** — opt-in per node: every config transaction
+  pauses before commit and shows the staged raw-config diff for
+  approval (cancel rolls the transaction back).
 - **HTTP request rules** — manage redirect and deny rules per
   frontend/backend with optional conditions, transactional and recorded.
 - **Audit attribution** — when authentication is enabled, every change is
   attributed to the signed-in user (visible in the History tab).
 - **Multi-node sync** — push selected frontends/backends (with servers)
   from one node to many, with per-target transactions and skip/overwrite
-  conflict handling.
+  conflict handling; optionally carries each section's WAF & bot rules
+  (named ACL bundles + deny rules) along, idempotently.
 - **Config drift detection** — compare the configuration of any two nodes
   (missing/extra objects, changed fields, server-set differences).
 - **Import/export** — export/import node registries (credentials
@@ -68,8 +74,9 @@ Query/Table, `node:sqlite`, and zod.
 - **Fleet health dashboard** — per-node status with latency history bars,
   server UP counts, and down-node/not-UP-server alerts.
 - **Alert webhooks & email** — POST notifications (Slack/Discord/generic)
-  and SMTP emails on node down/recovery transitions, with a 5-minute
-  cooldown and "send test" buttons for both channels.
+  and SMTP emails on node down/recovery transitions and **expiring
+  certificates** (daily scan, `HAPROXY_UI_CERT_WARN_DAYS` threshold,
+  per-certificate cooldown), with "send test" buttons for both channels.
 - **Security** — optional session-based authentication (signed HttpOnly
   cookie, login page, logout revocation, login rate limiting),
   AES-256-GCM encrypted credential storage at rest, and multi-user
@@ -82,7 +89,7 @@ Query/Table, `node:sqlite`, and zod.
 - **Upgrade orchestration** — per-node HAProxy binary upgrade wizard:
   config snapshot (rollback artifact), optional server drain, then
   version verification against the target with a run history.
-- **OpenAPI spec** — `/api/openapi.json` serves a 3.1 document with
+- **OpenAPI spec** — `/api/openapi` serves a 3.1 document with
   schemas generated from the same zod validators the API uses.
 - **Automation API** — admin-minted bearer tokens (hash-only storage,
   copy-once, instant revocation) let CI/curl scripts call the same
@@ -121,6 +128,7 @@ containers).
 | `HAPROXY_UI_LOG_PORT` | *(unset)* | UDP port for the HAProxy access-log receiver |
 | `HAPROXY_UI_LOG_SAMPLE` | `100` | Access-log sampling percent (1-100) |
 | `HAPROXY_UI_LOG_KEEP` | `24` | Access-log retention hours |
+| `HAPROXY_UI_CERT_WARN_DAYS` | `30` | Certificate expiry alert threshold (daily scan) |
 | `HAPROXY_UI_OIDC_ISSUER` | *(unset)* | OIDC issuer (enables SSO with client id/secret) |
 | `HAPROXY_UI_OIDC_CLIENT_ID` / `_SECRET` | *(unset)* | OIDC client credentials |
 | `HAPROXY_UI_OIDC_ADMIN_EMAILS` | *(unset)* | Comma list of e-mails that get the admin role |

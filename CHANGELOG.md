@@ -4,6 +4,41 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-09-07
+
+Safety and insight release: staged-change review before every config
+apply, certificate expiry alerting, access-log aggregations and
+WAF-aware multi-node sync.
+
+### Added
+- **Review before apply** (opt-in, per node header toggle): config
+  transactions pause before commit and show the staged raw-config
+  diff; cancelling rolls the transaction back. Implemented as a
+  preview gate in the transaction helper, so every config editor
+  (sections, servers, ACLs, rules, WAF bundles, rate limits) is
+  covered without per-page changes.
+- **Certificate expiry alerting**: daily scan of each node's stored
+  certificates (`HAPROXY_UI_CERT_WARN_DAYS`, default 30) feeding the
+  webhook + SMTP alert channels with a per-certificate 24h cooldown;
+  X.509 parsing extracted into a shared server module.
+- **Access-log aggregations** (`/api/logs/stats`): status-class totals
+  and average latency, per-5-minute request trend with 5xx overlay,
+  top clients and per-frontend breakdown — all computed SQL-side and
+  rendered above the request table.
+- **WAF sync**: "Include WAF & bot rules" in the sync dialog carries
+  each selected section's protection ACL bundles and deny rules to
+  target nodes, idempotent by (name, criterion, value) triple and
+  condition string.
+- API docs link to `/api/openapi` from the tokens page.
+
+### Changed
+- Alert delivery (webhook + email) extracted into a shared module now
+  reused by the health pipeline and the certificate checker.
+- The Prometheus endpoint counts recent log records with a SQL
+  `COUNT(*)` instead of materializing up to 1000 rows per node.
+- Dockerfile declares `1514/udp` for the access-log receiver (was TCP
+  only, which silently broke log ingestion in container deployments).
+
 ## [1.1.0] - 2026-09-07
 
 Rules, protection and operations release: a full traffic-rules engine,
@@ -44,7 +79,7 @@ endpoint, OIDC/SSO, SMTP alerts and upgrade orchestration.
   latency and the latest sampled per-object stats
 - Topology view: live session counts and request rates inline, hover
   details, and click-through navigation to the matching tab
-- OpenAPI 3.1 document at `/api/openapi.json`, schemas generated from
+- OpenAPI 3.1 document at `/api/openapi`, schemas generated from
   the API's own zod validators
 
 #### Platform
@@ -164,5 +199,6 @@ the official Data Plane API (v2/v3).
   tokens with runtime revocation
 - CSRF same-origin enforcement and security response headers
 
+[1.2.0]: https://github.com/example/haproxy-ui/releases/tag/v1.2.0
 [1.1.0]: https://github.com/example/haproxy-ui/releases/tag/v1.1.0
 [1.0.0]: https://github.com/example/haproxy-ui/releases/tag/v1.0.0

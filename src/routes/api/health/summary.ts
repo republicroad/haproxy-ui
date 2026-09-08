@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { publish } from "#/lib/events"
 import {
-  getAlertSettings,
   getAlertState,
-  getSmtpSettings,
   insertHealthCheck,
   lastHealthCheckTs,
   listHealthChecks,
@@ -14,7 +12,7 @@ import {
   updateNode,
 } from "#/lib/db"
 import { proxyToNode } from "#/lib/dataplane/proxy"
-import { sendMail } from "#/lib/smtp"
+import { alertChannelsEnabled, notifyEmail, notifyWebhook } from "#/lib/alertChannels"
 
 const ALERT_COOLDOWN_MS = 5 * 60_000
 
@@ -26,66 +24,29 @@ type AlertPayload = {
   ts: number
 }
 
-async function fireWebhook(payload: AlertPayload, webhookUrl: string): Promise<boolean> {
-  try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...payload, text: `HAProxy UI: ${payload.node.name} is ${payload.status}` }),
-      signal: AbortSignal.timeout(5000),
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
-async function fireEmail(payload: AlertPayload): Promise<boolean> {
-  const s = getSmtpSettings()
-  if (!s.enabled || !s.host || s.toAddrs.length === 0) return false
-  try {
-    await sendMail(
-      {
-        host: s.host,
-        port: s.port,
-        secure: s.secure,
-        username: s.username || undefined,
-        password: s.password || undefined,
-        from: s.fromAddr || "haproxy-ui@localhost",
-        to: s.toAddrs,
-      },
-      `[HAProxy UI] ${payload.node.name} is ${payload.status.toUpperCase()}`,
-      [
-        `Node: ${payload.node.name}`,
-        `Event: ${payload.event}`,
-        `Status: ${payload.status}`,
-        payload.error ? `Error: ${payload.error}` : null,
-        `Time: ${new Date(payload.ts).toISOString()}`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    )
-    return true
-  } catch {
-    return false
-  }
-}
-
 async function fireAlert(payload: AlertPayload): Promise<void> {
-  const { webhookUrl, enabled } = getAlertSettings()
-  const smtp = getSmtpSettings()
-  const webhookOn = enabled && Boolean(webhookUrl)
-  const emailOn = smtp.enabled && Boolean(smtp.host) && smtp.toAddrs.length > 0
-  if (!webhookOn && !emailOn) return
   const state = getAlertState(payload.node.id)
   const isDown = payload.event === "node_down"
   // only alert on transitions
   if (state.lastOk !== null && state.lastOk === !isDown) return
   if (Date.now() - state.lastAlertTs < ALERT_COOLDOWN_MS) return
+  if (!alertChannelsEnabled()) return
+
+  const text = `HAProxy UI: ${payload.node.name} is ${payload.status}`
+  const subject = `[HAProxy UI] ${payload.node.name} is ${payload.status.toUpperCase()}`
+  const body = [
+    `Node: ${payload.node.name}`,
+    `Event: ${payload.event}`,
+    `Status: ${payload.status}`,
+    payload.error ? `Error: ${payload.error}` : null,
+    `Time: ${new Date(payload.ts).toISOString()}`,
+  ]
+    .filter(Boolean)
+    .join("\n")
 
   let delivered = false
-  if (webhookOn) delivered = (await fireWebhook(payload, webhookUrl)) || delivered
-  if (emailOn) delivered = (await fireEmail(payload)) || delivered
+  delivered = (await notifyWebhook(text, payload)) || delivered
+  delivered = (await notifyEmail(subject, body)) || delivered
   if (delivered) setAlertState(payload.node.id, !isDown, Date.now())
 }
 

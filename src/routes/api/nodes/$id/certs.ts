@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { X509Certificate } from "node:crypto"
 import { proxyToNode } from "#/lib/dataplane/proxy"
+import { parsePemCert } from "#/lib/certCheck"
 
 async function dp(
   nodeId: string,
@@ -15,25 +15,6 @@ async function dp(
     body: body === undefined ? undefined : body,
   })
   return proxyToNode(nodeId, req, path)
-}
-
-function parsePem(pem: string):
-  | { ok: true; info: { subject: string; issuer: string; validTo: string; validFrom: string } }
-  | { ok: false; error: string } {
-  try {
-    const cert = new X509Certificate(pem)
-    return {
-      ok: true,
-      info: {
-        subject: cert.subject,
-        issuer: cert.issuer,
-        validTo: cert.validTo,
-        validFrom: cert.validFrom,
-      },
-    }
-  } catch (e) {
-    return { ok: false, error: (e as Error).message }
-  }
 }
 
 type StoredCert = { id?: string; storage_name?: string; description?: string }
@@ -61,7 +42,7 @@ export const Route = createFileRoute("/api/nodes/$id/certs")({
               `services/haproxy/storage/ssl/${encodeURIComponent(name)}`,
             ).catch(() => null)
             const pem = pemRes && pemRes.ok ? await pemRes.text() : ""
-            const parsed = pem.includes("BEGIN CERTIFICATE") ? parsePem(pem) : null
+            const parsed = pem.includes("BEGIN CERTIFICATE") ? parsePemCert(pem) : null
             return {
               name,
               description: c.description ?? "",
@@ -90,7 +71,7 @@ export const Route = createFileRoute("/api/nodes/$id/certs")({
         if (!pem.includes("BEGIN CERTIFICATE")) {
           return Response.json({ error: "pem must contain a CERTIFICATE block" }, { status: 400 })
         }
-        const parsed = parsePem(pem)
+        const parsed = parsePemCert(pem)
         if (!parsed.ok) {
           return Response.json({ error: `invalid certificate: ${parsed.error}` }, { status: 400 })
         }

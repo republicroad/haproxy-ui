@@ -165,3 +165,20 @@ export function aclValueForSignature(signature: string): string {
 export function signatureFromAclValue(value: string | undefined): string {
   return (value ?? "").replace(/^-i\s+-m\s+sub\s+/, "")
 }
+
+// --- fleet sync helpers ---
+
+const BOT_ACL_NAMES = new Set([BOT_BLOCK_ACL, BOT_DETECT_ACL, BOT_ALLOW_ACL])
+
+/** WAF presets, custom rules and bot lists all live under these names. */
+export function isProtectionAclName(name: string): boolean {
+  return name.startsWith("waf_") || BOT_ACL_NAMES.has(name)
+}
+
+/** True when a deny rule's condition references any protection ACL. */
+export function ruleReferencesProtection(rule: HttpRuleLike): boolean {
+  if (rule.type !== "deny") return false
+  return condTokens(rule.http_rule_condition?.val).some(
+    (t) => isProtectionAclName(t.replace(/^!/, "")),
+  )
+}

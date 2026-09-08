@@ -30,6 +30,155 @@ type LogRow = {
   path: string | null
 }
 
+type LogStatsSummary = {
+  stats: {
+    total: number
+    ok2xx: number
+    err4xx: number
+    err5xx: number
+    avgTimeMs: number | null
+  }
+  series: { ts: number; total: number; errors: number }[]
+  topClients: { clientIp: string; count: number }[]
+  frontends: { frontend: string; count: number; errors: number }[]
+}
+
+/** Compact per-bucket request volume chart (green bars, red error slice). */
+function TrendChart({ series }: { series: LogStatsSummary["series"] }) {
+  if (series.length === 0) {
+    return <p className="text-xs text-muted-foreground">No trend data yet.</p>
+  }
+  const max = Math.max(...series.map((s) => s.total), 1)
+  return (
+    <div className="flex h-24 items-end gap-[2px]" aria-label="request trend">
+      {series.map((s) => {
+        const h = Math.max(3, (s.total / max) * 100)
+        const errH = s.errors > 0 ? Math.max(2, (s.errors / max) * 100) : 0
+        return (
+          <div
+            key={s.ts}
+            title={`${new Date(s.ts).toLocaleTimeString()} — ${s.total} requests (${s.errors} x 5xx)`}
+            className="relative w-[6px] overflow-hidden rounded-sm bg-success/60"
+            style={{ height: `${h}%` }}
+          >
+            {errH > 0 && (
+              <div
+                className="absolute bottom-0 w-full bg-destructive/80"
+                style={{ height: `${(errH / h) * 100}%` }}
+              />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function StatChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string | number
+  tone?: "success" | "warning" | "destructive"
+}) {
+  const color =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning"
+        : tone === "destructive"
+          ? "text-destructive"
+          : ""
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`text-xl font-bold ${color}`}>{value}</div>
+    </div>
+  )
+}
+
+/** Aggregated view (SQL-side): totals, trend, top clients, frontends. */
+function LogsSummary({ nodeId }: { nodeId: string }) {
+  const q = useQuery({
+    queryKey: ["log-stats", nodeId],
+    queryFn: async (): Promise<LogStatsSummary> => {
+      const res = await fetch(`/api/logs/stats?node=${encodeURIComponent(nodeId)}&hours=24`)
+      if (!res.ok) throw new Error("failed to load log stats")
+      return res.json()
+    },
+    refetchInterval: POLL.STATS,
+  })
+  if (q.isLoading || q.isError) return null
+  const { stats, series, topClients, frontends } = q.data!
+  if (stats.total === 0) return null
+  const errRate = stats.total > 0 ? ((stats.err4xx + stats.err5xx) / stats.total) * 100 : 0
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      <div className="space-y-2 md:col-span-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <StatChip label="Requests 24h" value={stats.total} />
+          <StatChip label="2xx" value={stats.ok2xx} tone="success" />
+          <StatChip label="4xx" value={stats.err4xx} tone="warning" />
+          <StatChip label="5xx" value={stats.err5xx} tone="destructive" />
+          <StatChip
+            label="Avg ms"
+            value={stats.avgTimeMs ?? "—"}
+          />
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Requests per 5 min (red = 5xx)</span>
+            <span>{errRate.toFixed(1)}% 4xx/5xx</span>
+          </div>
+          <TrendChart series={series} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Top clients (24h)
+          </div>
+          {topClients.length === 0 ? (
+            <p className="text-xs text-muted-foreground">—</p>
+          ) : (
+            <div className="space-y-0.5">
+              {topClients.slice(0, 6).map((c) => (
+                <div key={c.clientIp} className="flex justify-between text-xs">
+                  <span className="font-mono">{c.clientIp}</span>
+                  <span className="text-muted-foreground">{c.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Frontends (24h)
+          </div>
+          {frontends.length === 0 ? (
+            <p className="text-xs text-muted-foreground">—</p>
+          ) : (
+            <div className="space-y-0.5">
+              {frontends.slice(0, 6).map((f) => (
+                <div key={f.frontend} className="flex justify-between text-xs">
+                  <span>{f.frontend}</span>
+                  <span className="text-muted-foreground">
+                    {f.count}
+                    {f.errors > 0 ? ` · ${f.errors} err` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatusBadge({ status }: { status: number | null }) {
   if (!status) return <span className="text-muted-foreground">—</span>
   const v =
@@ -79,6 +228,7 @@ export function LogsTab({
 
   return (
     <div className="space-y-3">
+      <LogsSummary nodeId={nodeId} />
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <Label className="mb-1 block text-xs text-muted-foreground">Frontend</Label>

@@ -21,6 +21,9 @@ COPY --from=build /app/scripts/prod-server.mjs ./scripts/prod-server.mjs
 COPY --from=build /app/package.json ./
 USER appuser
 EXPOSE 3000
+# HAProxy access-log receiver (only bound when HAPROXY_UI_LOG_PORT is set,
+# recommended 1514/udp — publish it explicitly for container deployments)
+EXPOSE 1514/udp
 ENV HAPROXY_UI_DB=/app/data/haproxy-ui.db
 VOLUME /app/data
 CMD ["node", "scripts/prod-server.mjs"]

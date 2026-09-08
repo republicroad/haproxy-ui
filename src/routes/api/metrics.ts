@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import {
+  countLogRecordsSince,
   listLatestHealthChecks,
-  listLogRecords,
   listMetricSamples,
   listNodes,
 } from "#/lib/db"
@@ -136,9 +136,7 @@ export const Route = createFileRoute("/api/metrics")({
             "gauge",
             nodes.map((n) => ({
               labels: `node="${escapeLabel(n.name)}"`,
-              value: listLogRecords({ nodeId: n.id, hours: 1, limit: 1000 }).filter(
-                (r) => Date.now() - r.ts < 300_000,
-              ).length,
+              value: countLogRecordsSince(n.id, 300_000),
             })),
           ),
         )

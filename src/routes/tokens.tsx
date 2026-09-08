@@ -100,7 +100,17 @@ function TokensPage() {
           <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">
             Authorization: Bearer &lt;token&gt;
           </code>
-          . Only the hash is stored — the plaintext is shown once.
+          . Only the hash is stored — the plaintext is shown once. The full
+          API surface is documented in{" "}
+          <a
+            href="/api/openapi"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-foreground"
+          >
+            /api/openapi
+          </a>
+          .
         </p>
       </div>
 

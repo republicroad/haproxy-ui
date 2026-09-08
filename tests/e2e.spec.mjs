@@ -234,6 +234,38 @@ test.describe.serial("haproxy-ui e2e", () => {
     await expect(page.getByText("Block bad bots disabled")).toBeVisible({ timeout: 15_000 })
   })
 
+  test("Review changes: staged diff gates applies when enabled", async ({ page }) => {
+    test.skip(!nodeId, "node not created")
+    await page.goto(`/nodes/${nodeId}`)
+    const toggle = page.getByLabel("review changes toggle")
+    await clickUntil(page, toggle, (opts) =>
+      expect(toggle).toHaveAttribute("aria-checked", "true", opts),
+    )
+
+    // create a frontend — the staged diff must appear before any apply
+    await goTab(page, "frontends")
+    await page.getByRole("button", { name: "New frontend" }).click()
+    await page.getByPlaceholder("name").fill("fe_review")
+    await page.getByPlaceholder("bind address").fill("*")
+    await page.getByRole("button", { name: "Create" }).click()
+    await expect(page.getByText("Review changes before apply")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("frontend fe_review").first()).toBeVisible()
+    await page.getByRole("button", { name: "Apply change" }).click()
+    await expect(page.getByText('Frontend "fe_review" created')).toBeVisible({ timeout: 15_000 })
+
+    // deleting goes through the same gate
+    const row = page.getByRole("row", { name: /fe_review/ })
+    await row.getByRole("button", { name: "Delete" }).click()
+    await expect(page.getByText("Review changes before apply")).toBeVisible({ timeout: 15_000 })
+    await page.getByRole("button", { name: "Apply change" }).click()
+    await expect(page.getByText('Frontend "fe_review" deleted')).toBeVisible({ timeout: 15_000 })
+
+    // leave review mode off for the remaining scenarios
+    await clickUntil(page, toggle, (opts) =>
+      expect(toggle).toHaveAttribute("aria-checked", "false", opts),
+    )
+  })
+
   test("users page: create and delete a user", async ({ page }) => {
     await page.goto("/users")
     await expect(page.getByRole("heading", { name: "Users" })).toBeVisible()

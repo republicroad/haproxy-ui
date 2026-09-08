@@ -25,13 +25,20 @@ function nodeIdFromPath(path: string): string | null {
   return null
 }
 
-/** Group-scoped identities may only touch nodes in their own group. */
-function scopeDeniedOnNode(scope: IdentityScope, nodeId: string | null): boolean {
+/**
+ * Group-scoped identities may only touch nodes in their own group.
+ * Enforcement is API-only: pages render and fetch their data through the
+ * enforced API. `nodeId === null` means a fleet-wide endpoint — denied,
+ * except the node list itself which already filters by group.
+ */
+function scopeDeniedOnNode(scope: IdentityScope, path: string, nodeId: string | null): boolean {
   if (scope.kind !== "group") return false
-  // fleet-wide endpoints are out of scope for group identities
-  if (nodeId === null) return true
-  const node = getNode(nodeId)
-  return !node || node.group !== scope.group
+  if (!path.startsWith("/api/")) return false
+  if (nodeId !== null) {
+    const node = getNode(nodeId)
+    return !node || node.group !== scope.group
+  }
+  return path.replace(/\/+$/, "") !== "/api/nodes"
 }
 
 /**
@@ -72,7 +79,7 @@ export const authMiddleware = createMiddleware().server(async ({ request, next }
         )
       }
       // group-scoped identities (group admins / group tokens): node targeting
-      if (scopeDeniedOnNode(identity.scope, nodeIdFromPath(path))) {
+      if (scopeDeniedOnNode(identity.scope, path, nodeIdFromPath(path))) {
         return Response.json(
           { error: "forbidden: outside your node group" },
           { status: 403 },

@@ -36,5 +36,12 @@ export default defineConfig({
       name: "sso",
       testMatch: /oidc\.spec\.mjs/,
     },
+    {
+      name: "scopes",
+      testMatch: /scopes\.spec\.mjs/,
+      // registers nodes on the shared dev server — must run after the
+      // projects that expect a clean fleet
+      dependencies: ["setup", "app", "viewer"],
+    },
   ],
 })

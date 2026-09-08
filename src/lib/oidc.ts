@@ -157,10 +157,37 @@ export async function exchangeCode(
   return body.id_token ? { id_token: body.id_token, access_token: body.access_token } : null
 }
 
+/** Extract string-array group memberships from a claim (tolerates single strings). */
+export function groupsFromClaims(claims: Record<string, unknown>, claim: string): string[] {
+  const raw = claims[claim]
+  if (typeof raw === "string") return raw ? [raw] : []
+  if (Array.isArray(raw)) return raw.filter((g): g is string => typeof g === "string")
+  return []
+}
+
+/** Resolve role + node group from claims (emails, admin groups, group map). */
+export function resolveRoleAndGroup(
+  cfg: OidcConfig,
+  claims: Record<string, unknown>,
+): { role: "admin" | "viewer"; group: string | null } {
+  const email = typeof claims.email === "string" ? claims.email.toLowerCase() : null
+  const idpGroups = groupsFromClaims(claims, cfg.groupClaim)
+
+  const adminViaEmail = email !== null && cfg.adminEmails.includes(email)
+  const adminViaGroup = idpGroups.some((g) => cfg.adminGroups.includes(g))
+  const mapped = cfg.groupMap.find((m) => idpGroups.includes(m.idpGroup))
+
+  // mapped groups grant the admin role scoped to the mapped node group
+  const role = adminViaEmail || adminViaGroup || mapped ? "admin" : "viewer"
+  const group = mapped && !adminViaGroup && !adminViaEmail ? mapped.nodeGroup : null
+  return { role, group }
+}
+
 /**
  * Create or update the local user for a verified id_token claim set.
- * Email (or preferred_username) is the identity; configured admin emails
- * get the admin role, existing users keep their role unless promoted.
+ * Email (or preferred_username) is the identity; admin role and node
+ * group can come from the configured admin emails or from IdP group
+ * claims, re-applied on every SSO login.
  */
 export function provisionUser(cfg: OidcConfig, claims: Record<string, unknown>): string {
   const email = typeof claims.email === "string" ? claims.email : null
@@ -168,18 +195,18 @@ export function provisionUser(cfg: OidcConfig, claims: Record<string, unknown>):
     email ?? (typeof claims.preferred_username === "string" ? claims.preferred_username : null)
   if (!username) throw new Error("id_token has neither email nor preferred_username")
 
-  const shouldBeAdmin = email !== null && cfg.adminEmails.includes(email.toLowerCase())
+  const { role, group } = resolveRoleAndGroup(cfg, claims)
   const existing = getUser(username)
   if (!existing) {
     insertUser({
       username,
       // password logins stay impossible: unguessable scrypt hash
       passHash: hashPassword(randomBytes(32).toString("hex")),
-      role: shouldBeAdmin ? "admin" : "viewer",
-      group: null,
+      role,
+      group,
     })
-  } else if (shouldBeAdmin && existing.role !== "admin") {
-    updateUser(username, { role: "admin" })
+  } else {
+    updateUser(username, { role, group })
   }
   return username
 }

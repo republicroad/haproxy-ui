@@ -51,7 +51,9 @@ import { Route as ApiNodesIdConfigRouteImport } from './routes/api/nodes/$id/con
 import { Route as ApiNodesIdMetricsRouteImport } from './routes/api/nodes/$id/metrics'
 import { Route as ApiNodesIdTestRouteImport } from './routes/api/nodes/$id/test'
 import { Route as ApiNodesIdUpgradeRouteImport } from './routes/api/nodes/$id/upgrade'
+import { Route as ApiNodesIdAdvisorFixRouteImport } from './routes/api/nodes/$id/advisor/fix'
 import { Route as ApiNodesIdChangesChangeIdRouteImport } from './routes/api/nodes/$id/changes/$changeId'
+import { Route as ApiNodesIdChangesExportRouteImport } from './routes/api/nodes/$id/changes/export'
 import { Route as ApiNodesIdChangesChangeIdRevertRouteImport } from './routes/api/nodes/$id/changes/$changeId/revert'
 
 const IndexRoute = IndexRouteImport.update({
@@ -264,12 +266,22 @@ const ApiNodesIdUpgradeRoute = ApiNodesIdUpgradeRouteImport.update({
   path: '/upgrade',
   getParentRoute: () => ApiNodesIdRoute,
 } as any)
+const ApiNodesIdAdvisorFixRoute = ApiNodesIdAdvisorFixRouteImport.update({
+  id: '/fix',
+  path: '/fix',
+  getParentRoute: () => ApiNodesIdAdvisorRoute,
+} as any)
 const ApiNodesIdChangesChangeIdRoute =
   ApiNodesIdChangesChangeIdRouteImport.update({
     id: '/$changeId',
     path: '/$changeId',
     getParentRoute: () => ApiNodesIdChangesRoute,
   } as any)
+const ApiNodesIdChangesExportRoute = ApiNodesIdChangesExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => ApiNodesIdChangesRoute,
+} as any)
 const ApiNodesIdChangesChangeIdRevertRoute =
   ApiNodesIdChangesChangeIdRevertRouteImport.update({
     id: '/revert',
@@ -313,14 +325,16 @@ export interface FileRoutesByFullPath {
   '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
   '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
-  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRoute
+  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRouteWithChildren
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/metrics': typeof ApiNodesIdMetricsRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
   '/api/nodes/$id/upgrade': typeof ApiNodesIdUpgradeRoute
+  '/api/nodes/$id/advisor/fix': typeof ApiNodesIdAdvisorFixRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
+  '/api/nodes/$id/changes/export': typeof ApiNodesIdChangesExportRoute
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
 }
 export interface FileRoutesByTo {
@@ -358,14 +372,16 @@ export interface FileRoutesByTo {
   '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
   '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
-  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRoute
+  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRouteWithChildren
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/metrics': typeof ApiNodesIdMetricsRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
   '/api/nodes/$id/upgrade': typeof ApiNodesIdUpgradeRoute
+  '/api/nodes/$id/advisor/fix': typeof ApiNodesIdAdvisorFixRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
+  '/api/nodes/$id/changes/export': typeof ApiNodesIdChangesExportRoute
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
 }
 export interface FileRoutesById {
@@ -405,14 +421,16 @@ export interface FileRoutesById {
   '/api/auth/oidc/start': typeof ApiAuthOidcStartRoute
   '/api/auth/oidc/status': typeof ApiAuthOidcStatusRoute
   '/api/dp/$nodeId/$': typeof ApiDpNodeIdSplatRoute
-  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRoute
+  '/api/nodes/$id/advisor': typeof ApiNodesIdAdvisorRouteWithChildren
   '/api/nodes/$id/certs': typeof ApiNodesIdCertsRoute
   '/api/nodes/$id/changes': typeof ApiNodesIdChangesRouteWithChildren
   '/api/nodes/$id/config': typeof ApiNodesIdConfigRoute
   '/api/nodes/$id/metrics': typeof ApiNodesIdMetricsRoute
   '/api/nodes/$id/test': typeof ApiNodesIdTestRoute
   '/api/nodes/$id/upgrade': typeof ApiNodesIdUpgradeRoute
+  '/api/nodes/$id/advisor/fix': typeof ApiNodesIdAdvisorFixRoute
   '/api/nodes/$id/changes/$changeId': typeof ApiNodesIdChangesChangeIdRouteWithChildren
+  '/api/nodes/$id/changes/export': typeof ApiNodesIdChangesExportRoute
   '/api/nodes/$id/changes/$changeId/revert': typeof ApiNodesIdChangesChangeIdRevertRoute
 }
 export interface FileRouteTypes {
@@ -460,7 +478,9 @@ export interface FileRouteTypes {
     | '/api/nodes/$id/metrics'
     | '/api/nodes/$id/test'
     | '/api/nodes/$id/upgrade'
+    | '/api/nodes/$id/advisor/fix'
     | '/api/nodes/$id/changes/$changeId'
+    | '/api/nodes/$id/changes/export'
     | '/api/nodes/$id/changes/$changeId/revert'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -505,7 +525,9 @@ export interface FileRouteTypes {
     | '/api/nodes/$id/metrics'
     | '/api/nodes/$id/test'
     | '/api/nodes/$id/upgrade'
+    | '/api/nodes/$id/advisor/fix'
     | '/api/nodes/$id/changes/$changeId'
+    | '/api/nodes/$id/changes/export'
     | '/api/nodes/$id/changes/$changeId/revert'
   id:
     | '__root__'
@@ -551,7 +573,9 @@ export interface FileRouteTypes {
     | '/api/nodes/$id/metrics'
     | '/api/nodes/$id/test'
     | '/api/nodes/$id/upgrade'
+    | '/api/nodes/$id/advisor/fix'
     | '/api/nodes/$id/changes/$changeId'
+    | '/api/nodes/$id/changes/export'
     | '/api/nodes/$id/changes/$changeId/revert'
   fileRoutesById: FileRoutesById
 }
@@ -879,11 +903,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNodesIdUpgradeRouteImport
       parentRoute: typeof ApiNodesIdRoute
     }
+    '/api/nodes/$id/advisor/fix': {
+      id: '/api/nodes/$id/advisor/fix'
+      path: '/fix'
+      fullPath: '/api/nodes/$id/advisor/fix'
+      preLoaderRoute: typeof ApiNodesIdAdvisorFixRouteImport
+      parentRoute: typeof ApiNodesIdAdvisorRoute
+    }
     '/api/nodes/$id/changes/$changeId': {
       id: '/api/nodes/$id/changes/$changeId'
       path: '/$changeId'
       fullPath: '/api/nodes/$id/changes/$changeId'
       preLoaderRoute: typeof ApiNodesIdChangesChangeIdRouteImport
+      parentRoute: typeof ApiNodesIdChangesRoute
+    }
+    '/api/nodes/$id/changes/export': {
+      id: '/api/nodes/$id/changes/export'
+      path: '/export'
+      fullPath: '/api/nodes/$id/changes/export'
+      preLoaderRoute: typeof ApiNodesIdChangesExportRouteImport
       parentRoute: typeof ApiNodesIdChangesRoute
     }
     '/api/nodes/$id/changes/$changeId/revert': {
@@ -919,6 +957,17 @@ const ApiLogsRouteChildren: ApiLogsRouteChildren = {
 const ApiLogsRouteWithChildren =
   ApiLogsRoute._addFileChildren(ApiLogsRouteChildren)
 
+interface ApiNodesIdAdvisorRouteChildren {
+  ApiNodesIdAdvisorFixRoute: typeof ApiNodesIdAdvisorFixRoute
+}
+
+const ApiNodesIdAdvisorRouteChildren: ApiNodesIdAdvisorRouteChildren = {
+  ApiNodesIdAdvisorFixRoute: ApiNodesIdAdvisorFixRoute,
+}
+
+const ApiNodesIdAdvisorRouteWithChildren =
+  ApiNodesIdAdvisorRoute._addFileChildren(ApiNodesIdAdvisorRouteChildren)
+
 interface ApiNodesIdChangesChangeIdRouteChildren {
   ApiNodesIdChangesChangeIdRevertRoute: typeof ApiNodesIdChangesChangeIdRevertRoute
 }
@@ -935,17 +984,19 @@ const ApiNodesIdChangesChangeIdRouteWithChildren =
 
 interface ApiNodesIdChangesRouteChildren {
   ApiNodesIdChangesChangeIdRoute: typeof ApiNodesIdChangesChangeIdRouteWithChildren
+  ApiNodesIdChangesExportRoute: typeof ApiNodesIdChangesExportRoute
 }
 
 const ApiNodesIdChangesRouteChildren: ApiNodesIdChangesRouteChildren = {
   ApiNodesIdChangesChangeIdRoute: ApiNodesIdChangesChangeIdRouteWithChildren,
+  ApiNodesIdChangesExportRoute: ApiNodesIdChangesExportRoute,
 }
 
 const ApiNodesIdChangesRouteWithChildren =
   ApiNodesIdChangesRoute._addFileChildren(ApiNodesIdChangesRouteChildren)
 
 interface ApiNodesIdRouteChildren {
-  ApiNodesIdAdvisorRoute: typeof ApiNodesIdAdvisorRoute
+  ApiNodesIdAdvisorRoute: typeof ApiNodesIdAdvisorRouteWithChildren
   ApiNodesIdCertsRoute: typeof ApiNodesIdCertsRoute
   ApiNodesIdChangesRoute: typeof ApiNodesIdChangesRouteWithChildren
   ApiNodesIdConfigRoute: typeof ApiNodesIdConfigRoute
@@ -955,7 +1006,7 @@ interface ApiNodesIdRouteChildren {
 }
 
 const ApiNodesIdRouteChildren: ApiNodesIdRouteChildren = {
-  ApiNodesIdAdvisorRoute: ApiNodesIdAdvisorRoute,
+  ApiNodesIdAdvisorRoute: ApiNodesIdAdvisorRouteWithChildren,
   ApiNodesIdCertsRoute: ApiNodesIdCertsRoute,
   ApiNodesIdChangesRoute: ApiNodesIdChangesRouteWithChildren,
   ApiNodesIdConfigRoute: ApiNodesIdConfigRoute,

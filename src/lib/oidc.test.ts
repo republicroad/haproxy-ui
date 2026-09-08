@@ -32,6 +32,9 @@ const cfg = {
   clientId: "haproxy-ui",
   clientSecret: "s3cret",
   adminEmails: ["ops@example.com"],
+  groupClaim: "groups",
+  adminGroups: [],
+  groupMap: [],
 }
 
 const discovery = {
@@ -161,5 +164,42 @@ describe("provisionUser", () => {
     // existing admins are not demoted by later logins
     oidc.provisionUser(cfg, { email: "ops@example.com" })
     expect(db.listUsers().find((u) => u.username === a)?.role).toBe("admin")
+  })
+
+  it("maps IdP group claims to role and node group", async () => {
+    const oidc: OidcModule = await import("./oidc")
+    const db = await import("#/lib/db")
+
+    const grpCfg = {
+      issuer: "https://idp.example.com",
+      clientId: "haproxy-ui",
+      clientSecret: "s3cret",
+      adminEmails: [],
+      groupClaim: "groups",
+      adminGroups: ["haproxy-admins"],
+      groupMap: [
+        { idpGroup: "edge-ops", nodeGroup: "edge" },
+        { idpGroup: "core-ops", nodeGroup: "core" },
+      ],
+    }
+
+    // admin via IdP group → global admin (no node-group pin)
+    oidc.provisionUser(grpCfg, { email: "root@sso.example.com", groups: ["haproxy-admins"] })
+    // group admin via mapping
+    oidc.provisionUser(grpCfg, { email: "edge@sso.example.com", groups: ["edge-ops"] })
+    // no matching group → plain viewer
+    oidc.provisionUser(grpCfg, { email: "other@sso.example.com", groups: ["hr"] })
+    // single-string claim tolerated
+    oidc.provisionUser(grpCfg, { email: "core@sso.example.com", groups: "core-ops" })
+
+    const byName = Object.fromEntries(db.listUsers().map((u) => [u.username, u]))
+    expect(byName["root@sso.example.com"].role).toBe("admin")
+    expect(byName["root@sso.example.com"].group).toBeNull()
+    // mapped groups grant the admin role scoped to the mapped node group
+    expect(byName["edge@sso.example.com"].role).toBe("admin")
+    expect(byName["edge@sso.example.com"].group).toBe("edge")
+    expect(byName["other@sso.example.com"].role).toBe("viewer")
+    expect(byName["other@sso.example.com"].group).toBeNull()
+    expect(byName["core@sso.example.com"].group).toBe("core")
   })
 })

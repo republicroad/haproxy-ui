@@ -51,7 +51,7 @@ export function SyncModal({
   const [includeWaf, setIncludeWaf] = useState(false)
   const [targets, setTargets] = useState<Set<string>>(new Set())
   const [conflict, setConflict] = useState<"skip" | "overwrite">("skip")
-  const [results, setResults] = useState<SyncResult[] | null>(null)
+  const [results, setResults] = useState<{ list: SyncResult[]; dry: boolean } | null>(null)
 
   const nodesQ = useQuery({
     queryKey: ["nodes"],
@@ -75,7 +75,7 @@ export function SyncModal({
   const otherNodes = (nodesQ.data ?? []).filter((n) => n.id !== nodeId)
 
   const syncMut = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (dry: boolean): Promise<SyncResult[]> => {
       const fes = frontends.filter((f) => feSel.has(f.name))
       // Real dataplaneapi does not embed servers in the backends collection;
       // fetch each selected backend's servers from the sub-endpoint.
@@ -101,148 +101,160 @@ export function SyncModal({
           const tFeNames = new Set(tFes.map((f) => f.name))
           const tBeNames = new Set(tBes.map((b) => b.name))
 
-          await withTransaction(
-            t,
-            async (tx) => {
-              for (const b of bes) {
-                const backendExists = tBeNames.has(b.name)
-                if (backendExists && conflict === "skip") {
-                  r.skipped.push(`backend/${b.name}`)
-                } else {
-                  if (backendExists) {
-                    await dpDelete(
-                      t,
-                      `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}`,
-                      tx,
-                    )
-                  }
-                  const { servers: _, ...bePayload } = b
-                  await dpPost(t, "services/haproxy/configuration/backends", bePayload, tx)
-                  r.created.push(`backend/${b.name}`)
-                }
-                if (includeServers) {
-                  const targetSrv = backendExists && conflict === "skip"
-                    ? await dpGet<{ name: string }[]>(
-                        t,
-                        `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}/servers`,
-                      )
-                    : []
-                  const targetSrvNames = new Set(targetSrv.map((s) => s.name))
-                  for (const s of serversOf(b)) {
-                    if (targetSrvNames.has(s.name)) {
-                      r.skipped.push(`server/${b.name}/${s.name}`)
-                      continue
-                    }
-                    await dpPost(
-                      t,
-                      `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}/servers`,
-                      s,
-                      tx,
-                    )
-                    r.created.push(`server/${b.name}/${s.name}`)
-                  }
-                }
-              }
-              for (const f of fes) {
-                if (tFeNames.has(f.name)) {
-                  if (conflict === "skip") {
-                    r.skipped.push(`frontend/${f.name}`)
-                    continue
-                  }
-                  await dpDelete(
-                    t,
-                    `services/haproxy/configuration/frontends/${encodeURIComponent(f.name)}`,
+          // in preview (dry) mode the whole plan is computed against the
+          // target's live state but writes are recorded, never sent
+          const wPost = async (path: string, body: unknown, tx: string | null) => {
+            if (!dry) await dpPost(t, path, body, tx ?? undefined)
+          }
+          const wDelete = async (path: string, tx: string | null) => {
+            if (!dry) await dpDelete(t, path, tx ?? undefined)
+          }
+
+          const plan = async (tx: string | null) => {
+            for (const b of bes) {
+              const backendExists = tBeNames.has(b.name)
+              if (backendExists && conflict === "skip") {
+                r.skipped.push(`backend/${b.name}`)
+              } else {
+                if (backendExists) {
+                  await wDelete(
+                    `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}`,
                     tx,
                   )
                 }
-                await dpPost(t, "services/haproxy/configuration/frontends", f, tx)
-                r.created.push(`frontend/${f.name}`)
+                const { servers: _, ...bePayload } = b
+                await wPost("services/haproxy/configuration/backends", bePayload, tx)
+                r.created.push(`backend/${b.name}`)
               }
-
-              // WAF & bot bundles: append protection ACLs and deny rules that
-              // the target section doesn't have yet (keyed by full triple /
-              // condition string so repeated syncs are idempotent).
-              if (includeWaf) {
-                const sections = [
-                  ...fes.map((f) => ({
-                    type: "frontends" as const,
-                    name: f.name,
-                    exists: tFeNames.has(f.name),
-                  })),
-                  ...bes.map((b) => ({
-                    type: "backends" as const,
-                    name: b.name,
-                    exists: tBeNames.has(b.name),
-                  })),
-                ]
-                for (const sec of sections) {
-                  if (!sec.exists && conflict === "skip") continue
-                  const secBase = `services/haproxy/configuration/${sec.type}/${encodeURIComponent(sec.name)}`
-                  const [srcAcls, srcRules, tAcls, tRules] = await Promise.all([
-                    dpGet<AclLine[]>(nodeId, `${secBase}/acls`).catch(() => []),
-                    dpGet<HttpRuleLike[]>(nodeId, `${secBase}/http_request_rules`).catch(() => []),
-                    dpGet<AclLine[]>(t, `${secBase}/acls`).catch(() => []),
-                    dpGet<HttpRuleLike[]>(t, `${secBase}/http_request_rules`).catch(() => []),
-                  ])
-                  const tKeys = new Set(
-                    tAcls.map((a) => `${a.acl_name}|${a.criterion}|${a.value ?? ""}`),
-                  )
-                  let at = tAcls.length
-                  for (const a of srcAcls.filter((x) => isProtectionAclName(x.acl_name))) {
-                    const k = `${a.acl_name}|${a.criterion}|${a.value ?? ""}`
-                    if (tKeys.has(k)) {
-                      r.skipped.push(`waf/${sec.name}/${a.acl_name}`)
-                      continue
-                    }
-                    await dpPost(t, `${secBase}/acls/${at}`, a, tx)
-                    at++
-                    r.created.push(`waf/${sec.name}/${a.acl_name}`)
+              if (includeServers) {
+                const targetSrv = backendExists && conflict === "skip"
+                  ? await dpGet<{ name: string }[]>(
+                      t,
+                      `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}/servers`,
+                    )
+                  : []
+                const targetSrvNames = new Set(targetSrv.map((s) => s.name))
+                for (const s of serversOf(b)) {
+                  if (targetSrvNames.has(s.name)) {
+                    r.skipped.push(`server/${b.name}/${s.name}`)
+                    continue
                   }
-                  const tConds = new Set(
-                    tRules.filter(ruleReferencesProtection).map(
-                      (x) => x.http_rule_condition?.val ?? "",
-                    ),
+                  await wPost(
+                    `services/haproxy/configuration/backends/${encodeURIComponent(b.name)}/servers`,
+                    s,
+                    tx,
                   )
-                  let rat = tRules.length
-                  for (const rr of srcRules.filter(ruleReferencesProtection)) {
-                    const cond = rr.http_rule_condition?.val ?? ""
-                    if (tConds.has(cond)) {
-                      r.skipped.push(`waf/${sec.name}/deny:${cond}`)
-                      continue
-                    }
-                    await dpPost(t, `${secBase}/http_request_rules/${rat}`, rr, tx)
-                    rat++
-                    r.created.push(`waf/${sec.name}/deny:${cond}`)
-                  }
+                  r.created.push(`server/${b.name}/${s.name}`)
                 }
               }
-            },
-            [
-              ...bes.flatMap((b) => [
-                {
+            }
+            for (const f of fes) {
+              if (tFeNames.has(f.name)) {
+                if (conflict === "skip") {
+                  r.skipped.push(`frontend/${f.name}`)
+                  continue
+                }
+                await wDelete(
+                  `services/haproxy/configuration/frontends/${encodeURIComponent(f.name)}`,
+                  tx,
+                )
+              }
+              await wPost("services/haproxy/configuration/frontends", f, tx)
+              r.created.push(`frontend/${f.name}`)
+            }
+
+            // WAF & bot bundles: append protection ACLs and deny rules that
+            // the target section doesn't have yet (keyed by full triple /
+            // condition string so repeated syncs are idempotent).
+            if (includeWaf) {
+              const sections = [
+                ...fes.map((f) => ({
+                  type: "frontends" as const,
+                  name: f.name,
+                  exists: tFeNames.has(f.name),
+                })),
+                ...bes.map((b) => ({
+                  type: "backends" as const,
+                  name: b.name,
+                  exists: tBeNames.has(b.name),
+                })),
+              ]
+              for (const sec of sections) {
+                if (!sec.exists && conflict === "skip") continue
+                const secBase = `services/haproxy/configuration/${sec.type}/${encodeURIComponent(sec.name)}`
+                const [srcAcls, srcRules, tAcls, tRules] = await Promise.all([
+                  dpGet<AclLine[]>(nodeId, `${secBase}/acls`).catch(() => []),
+                  dpGet<HttpRuleLike[]>(nodeId, `${secBase}/http_request_rules`).catch(() => []),
+                  dpGet<AclLine[]>(t, `${secBase}/acls`).catch(() => []),
+                  dpGet<HttpRuleLike[]>(t, `${secBase}/http_request_rules`).catch(() => []),
+                ])
+                const tKeys = new Set(
+                  tAcls.map((a) => `${a.acl_name}|${a.criterion}|${a.value ?? ""}`),
+                )
+                let at = tAcls.length
+                for (const a of srcAcls.filter((x) => isProtectionAclName(x.acl_name))) {
+                  const k = `${a.acl_name}|${a.criterion}|${a.value ?? ""}`
+                  if (tKeys.has(k)) {
+                    r.skipped.push(`waf/${sec.name}/${a.acl_name}`)
+                    continue
+                  }
+                  await wPost(`${secBase}/acls/${at}`, a, tx)
+                  at++
+                  r.created.push(`waf/${sec.name}/${a.acl_name}`)
+                }
+                const tConds = new Set(
+                  tRules.filter(ruleReferencesProtection).map(
+                    (x) => x.http_rule_condition?.val ?? "",
+                  ),
+                )
+                let rat = tRules.length
+                for (const rr of srcRules.filter(ruleReferencesProtection)) {
+                  const cond = rr.http_rule_condition?.val ?? ""
+                  if (tConds.has(cond)) {
+                    r.skipped.push(`waf/${sec.name}/deny:${cond}`)
+                    continue
+                  }
+                  await wPost(`${secBase}/http_request_rules/${rat}`, rr, tx)
+                  rat++
+                  r.created.push(`waf/${sec.name}/deny:${cond}`)
+                }
+              }
+            }
+          }
+
+          if (dry) {
+            await plan(null)
+          } else {
+            await withTransaction(
+              t,
+              (tx) => plan(tx),
+              [
+                ...bes.flatMap((b) => [
+                  {
+                    kind: "create" as const,
+                    resource: "backend" as const,
+                    target: b.name,
+                    payload: { name: b.name, mode: b.mode, balance: b.balance },
+                  },
+                  ...(includeServers
+                    ? serversOf(b).map((s) => ({
+                        kind: "create" as const,
+                        resource: "server" as const,
+                        target: s.name,
+                        parent: b.name,
+                        payload: s,
+                      }))
+                    : []),
+                ]),
+                ...fes.map((f) => ({
                   kind: "create" as const,
-                  resource: "backend" as const,
-                  target: b.name,
-                  payload: { name: b.name, mode: b.mode, balance: b.balance },
-                },
-                ...(includeServers
-                  ? serversOf(b).map((s) => ({
-                      kind: "create" as const,
-                      resource: "server" as const,
-                      target: s.name,
-                      parent: b.name,
-                      payload: s,
-                    }))
-                  : []),
-              ]),
-              ...fes.map((f) => ({
-                kind: "create" as const,
-                resource: "frontend" as const,
-                target: f.name,
-                payload: f,
-              })),
-            ],
-          )
+                  resource: "frontend" as const,
+                  target: f.name,
+                  payload: f,
+                })),
+              ],
+            )
+          }
         } catch (e) {
           r.error = (e as Error).message
         }
@@ -250,10 +262,14 @@ export function SyncModal({
       }
       return out
     },
-    onSuccess: (rs) => {
-      setResults(rs)
+    onSuccess: (rs, dry) => {
+      setResults({ list: rs, dry })
       const ok = rs.filter((r) => !r.error).length
-      toast.success(`Sync finished: ${ok}/${rs.length} nodes updated`)
+      toast.success(
+        dry
+          ? `Preview ready: ${ok}/${rs.length} nodes analyzed`
+          : `Sync finished: ${ok}/${rs.length} nodes updated`,
+      )
     },
     onError: (e) =>
       toast.error("Sync failed", { description: (e as Error).message }),
@@ -265,19 +281,28 @@ export function SyncModal({
     <Modal open onClose={onClose} title="Sync configuration to nodes" wide>
       {results ? (
         <div className="flex flex-col gap-3">
-          {results.map((r) => (
+          {results.dry && (
+            <p className="rounded-md border border-info/40 bg-info/5 p-2 text-sm text-muted-foreground">
+              Preview — nothing has been applied. Review the plan below, then
+              apply it.
+            </p>
+          )}
+          {results.list.map((r) => (
             <div key={r.node} className="rounded-md border border-border p-3 text-sm">
               <div className="font-medium">
                 {nodesQ.data?.find((n) => n.id === r.node)?.name ?? r.node}
                 {r.error ? (
                   <span className="ml-2 text-destructive">failed</span>
+                ) : results.dry ? (
+                  <span className="ml-2 text-info">analyzed</span>
                 ) : (
                   <span className="ml-2 text-success">updated</span>
                 )}
               </div>
               {r.created.length > 0 && (
                 <div className="mt-1 text-muted-foreground">
-                  Created: {r.created.join(", ")}
+                  {results.dry ? "Would create: " : "Created: "}
+                  {r.created.join(", ")}
                 </div>
               )}
               {r.skipped.length > 0 && (
@@ -288,10 +313,18 @@ export function SyncModal({
               {r.error && <div className="mt-1 text-destructive">{r.error}</div>}
             </div>
           ))}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
+            {results.dry && (
+              <Button
+                disabled={syncMut.isPending}
+                onClick={() => syncMut.mutate(false)}
+              >
+                {syncMut.isPending ? "Applying…" : "Apply to nodes"}
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -435,7 +468,14 @@ export function SyncModal({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={() => syncMut.mutate()} disabled={!canSync}>
+            <Button
+              variant="outline"
+              onClick={() => syncMut.mutate(true)}
+              disabled={!canSync}
+            >
+              {syncMut.isPending ? "Working…" : "Preview"}
+            </Button>
+            <Button onClick={() => syncMut.mutate(false)} disabled={!canSync}>
               {syncMut.isPending
                 ? "Syncing…"
                 : `Sync to ${targets.size} node${targets.size === 1 ? "" : "s"}`}

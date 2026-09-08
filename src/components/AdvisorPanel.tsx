@@ -1,7 +1,10 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
+import { toast } from "sonner"
 import { Badge } from "#/components/reui/badge"
+import { Button } from "#/components/ui/button"
 
 type Finding = {
   severity: "high" | "medium" | "low"
@@ -24,6 +27,8 @@ const severityVariant = { high: "destructive", medium: "warning", low: "secondar
  * orphaned objects).
  */
 export function AdvisorPanel({ nodeId }: { nodeId: string }) {
+  const qc = useQueryClient()
+  const [fixing, setFixing] = useState(false)
   const q = useQuery({
     queryKey: ["advisor", nodeId],
     queryFn: async (): Promise<AdvisorResponse> => {
@@ -37,6 +42,30 @@ export function AdvisorPanel({ nodeId }: { nodeId: string }) {
 
   if (q.isLoading || q.isError || !q.data) return null
   const { summary, findings } = q.data
+
+  const enableChecks = async () => {
+    setFixing(true)
+    try {
+      const res = await fetch(`/api/nodes/${nodeId}/advisor/fix`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fix: "enable-checks" }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? "fix failed")
+      toast.success(
+        j.fixed > 0
+          ? `Health checks enabled on ${j.fixed} of ${j.total} servers`
+          : `All ${j.total} servers already have checks enabled`,
+      )
+      qc.invalidateQueries({ queryKey: ["advisor", nodeId] })
+    } catch (e) {
+      toast.error("Fix failed", { description: (e as Error).message })
+    } finally {
+      setFixing(false)
+    }
+  }
+
   if (findings.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-card p-4">
@@ -56,7 +85,12 @@ export function AdvisorPanel({ nodeId }: { nodeId: string }) {
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold">Config advisor</div>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {findings.some((f) => f.title === "Server has no active health check") && (
+            <Button size="xs" variant="outline" disabled={fixing} onClick={() => void enableChecks()}>
+              {fixing ? "Fixing…" : "Enable all health checks"}
+            </Button>
+          )}
           {summary.high > 0 && <Badge variant="destructive">{summary.high} high</Badge>}
           {summary.medium > 0 && <Badge variant="warning">{summary.medium} medium</Badge>}
           {summary.low > 0 && <Badge variant="secondary">{summary.low} low</Badge>}

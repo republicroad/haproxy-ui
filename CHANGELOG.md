@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.2.0] - 2026-09-09
+
+RBAC-completion and audit release: OIDC group-claim mapping, CSV audit
+export, sync preview and one-click advisor fixes.
+
+### Added
+- **OIDC group claims**: HAPROXY_UI_OIDC_GROUP_CLAIM (default groups),
+  _ADMIN_GROUPS (IdP groups granting the global admin role) and
+  _GROUP_MAP (idpGroup:nodeGroup pairs granting group-admin) let
+  role and node-group assignment be managed entirely in the identity
+  provider, re-applied on every SSO login.
+- **Audit export**: CSV download of a node's configuration change
+  history (/api/nodes/:id/changes/export, Export CSV button in the
+  history tab).
+- **Sync preview**: dry-run computes the full per-target plan (sections,
+  servers, WAF bundles) against live target state without writing;
+  results show what would be created/skipped before applying.
+- **Advisor one-click fix**: enable active health checks on every
+  server that has them disabled, in a single validated transaction.
+
+### Fixed
+- Group-scoped identities could no longer load the node list page (the
+  fleet-wide guard caught the page and its list endpoint); the list is
+  group-filtered and both are allowed again.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.1.0] - 2026-09-09

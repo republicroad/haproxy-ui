@@ -1,4 +1,4 @@
-# [![v2.1.0](https://img.shields.io/badge/version-2.1.0-blue)](CHANGELOG.md)
+# [![v2.2.0](https://img.shields.io/badge/version-2.2.0-blue)](CHANGELOG.md)
 
 # HAProxy UI
 
@@ -153,6 +153,9 @@ containers).
 | `HAPROXY_UI_OIDC_ISSUER` | *(unset)* | OIDC issuer (enables SSO with client id/secret) |
 | `HAPROXY_UI_OIDC_CLIENT_ID` / `_SECRET` | *(unset)* | OIDC client credentials |
 | `HAPROXY_UI_OIDC_ADMIN_EMAILS` | *(unset)* | Comma list of e-mails that get the admin role |
+| `HAPROXY_UI_OIDC_GROUP_CLAIM` | `groups` | id_token claim carrying group memberships |
+| `HAPROXY_UI_OIDC_ADMIN_GROUPS` | *(unset)* | IdP groups that grant the global admin role |
+| `HAPROXY_UI_OIDC_GROUP_MAP` | *(unset)* | `idpGroup:nodeGroup` pairs granting group-admin |
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | Production server bind (prod-server.mjs) |
 
 ## Production

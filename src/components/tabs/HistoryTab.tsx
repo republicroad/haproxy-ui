@@ -254,6 +254,15 @@ export function HistoryTab({ nodeId }: { nodeId: string }) {
               <Button
                 size="xs"
                 variant="outline"
+                onClick={() => {
+                  window.location.href = `/api/nodes/${nodeId}/changes/export`
+                }}
+              >
+                Export CSV
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
                 onClick={() => setCleanupFor("days")}
                 disabled={cleanupMut.isPending}
               >

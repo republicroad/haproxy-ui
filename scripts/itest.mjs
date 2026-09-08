@@ -106,7 +106,7 @@ const run = async () => {
   tx = await newTx()
   r = await dp(
     "POST",
-    `services/haproxy/configuration/backends/be_int/http_checks/0?transaction_id=${tx}`,
+    `services/haproxy/configuration/backends/be_int/http_checks?transaction_id=${tx}`,
     { type: "expect", value: "status 200" },
   )
   console.log("http check:", r.status, r.ok ? "" : await r.clone().text())
@@ -122,7 +122,7 @@ const run = async () => {
         type: "ip",
         size: 100000,
         expire: 10,
-        store: ["http_req_rate(10s)"],
+        store: "http_req_rate(10s)",
       },
     },
   )

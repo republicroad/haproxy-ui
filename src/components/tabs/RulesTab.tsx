@@ -275,13 +275,17 @@ export function RulesTab({
     rows: unknown[] | undefined,
     body: unknown,
     meta: { resource: ChangeMeta["resource"]; target: string },
+    collectionPost = false,
   ) => {
     setPending(true)
     try {
       await withTransaction(
         nodeId,
         async (tx) => {
-          await dpPost(nodeId, `${sub(name)}/${rows?.length ?? 0}`, body, tx)
+          // real dataplaneapi: rule subresources are indexed POSTs, but
+          // http_checks uses the collection endpoint
+          const path = collectionPost ? sub(name) : `${sub(name)}/${rows?.length ?? 0}`
+          await dpPost(nodeId, path, body, tx)
         },
         {
           kind: "create",
@@ -572,7 +576,7 @@ export function RulesTab({
                 type: "ip",
                 size: 100_000,
                 expire: periodSeconds,
-                store: [`http_req_rate(${periodSeconds}s)`],
+                store: `http_req_rate(${periodSeconds}s)`,
               },
             },
             tx,
@@ -888,15 +892,18 @@ export function RulesTab({
                         return
                       }
                       setChkErrors({})
-                      // dataplaneapi models an expectation as {type:"expect", value:"<kind> <value>"}
+                      // dataplaneapi models an expectation as
+                      // {type:"expect", value:"<kind> <value>"} and creates
+                      // http_checks via the collection endpoint (no index)
                       void addIndexed(
                         "http_checks",
-                        checkQ.data,
+                        undefined,
                         { type: "expect", value: `${parsed.data.type} ${parsed.data.value}` },
                         {
                           resource: "check",
                           target: `${parsed.data.type} ${parsed.data.value}`,
                         },
+                        true,
                       )
                     }}
                     disabled={pending || !effectiveName}

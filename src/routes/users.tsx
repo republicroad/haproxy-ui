@@ -14,12 +14,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select"
+import { POLL } from "#/lib/poll"
 
 type UserRow = {
   username: string
   role: "admin" | "viewer"
+  group: string | null
   createdAt: number
 }
+
+type SessionRow = {
+  id: string
+  username: string
+  createdAt: number
+  lastSeen: number
+  ip: string | null
+  userAgent: string | null
+}
+
+type BackupRow = { name: string; size: number; mtime: number }
 
 async function fetchMe(): Promise<{ username: string | null; role: string | null }> {
   const res = await fetch("/api/auth/status")
@@ -27,10 +40,130 @@ async function fetchMe(): Promise<{ username: string | null; role: string | null
   return res.json()
 }
 
+function fmtSize(n: number): string {
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** Active session list with per-session revocation (global admins). */
+function SessionsCard() {
+  const qc = useQueryClient()
+  const q = useQuery({
+    queryKey: ["sessions"],
+    queryFn: async (): Promise<SessionRow[]> => {
+      const res = await fetch("/api/sessions")
+      if (!res.ok) throw new Error("failed to load sessions")
+      return res.json()
+    },
+    refetchInterval: POLL.NODES,
+  })
+  const revoke = async (id: string) => {
+    const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" })
+    if (!res.ok) {
+      toast.error("revoke failed")
+      return
+    }
+    toast.success("Session revoked")
+    qc.invalidateQueries({ queryKey: ["sessions"] })
+  }
+  const sessions = q.data ?? []
+
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="mb-2 text-sm font-semibold">Active sessions</div>
+      {q.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!q.isLoading && sessions.length === 0 && (
+        <p className="text-sm text-muted-foreground">No active sessions recorded yet.</p>
+      )}
+      {sessions.map((s) => (
+        <div
+          key={s.id}
+          className="flex items-center justify-between gap-2 border-t border-border py-1.5 text-xs first:border-t-0"
+        >
+          <div className="min-w-0">
+            <div className="font-medium">
+              {s.username}
+              <span className="ml-2 text-muted-foreground">
+                {s.ip ?? "local"} · last active {new Date(s.lastSeen).toLocaleString()}
+              </span>
+            </div>
+            {s.userAgent && (
+              <div className="truncate text-muted-foreground" title={s.userAgent}>
+                {s.userAgent}
+              </div>
+            )}
+          </div>
+          <Button size="xs" variant="destructive" onClick={() => void revoke(s.id)}>
+            Revoke
+          </Button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** UI database backups (VACUUM INTO) — global admins. */
+function BackupsCard() {
+  const qc = useQueryClient()
+  const [pending, setPending] = useState(false)
+  const q = useQuery({
+    queryKey: ["db-backups"],
+    queryFn: async (): Promise<{ dir: string; files: BackupRow[] }> => {
+      const res = await fetch("/api/db/backup")
+      if (!res.ok) throw new Error("failed to load backups")
+      return res.json()
+    },
+  })
+  const backup = async () => {
+    setPending(true)
+    try {
+      const res = await fetch("/api/db/backup", { method: "POST" })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error ?? "backup failed")
+      toast.success(`Backup written: ${j.name}`)
+      qc.invalidateQueries({ queryKey: ["db-backups"] })
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setPending(false)
+    }
+  }
+  const files = q.data?.files ?? []
+
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold">Database backups</div>
+        <Button size="sm" variant="outline" disabled={pending} onClick={() => void backup()}>
+          {pending ? "Backing up…" : "Backup now"}
+        </Button>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Online SQLite snapshots (<code>VACUUM INTO</code>) to{" "}
+        <code>{q.data?.dir ?? "backups/"}</code>. Restore: stop the app,
+        replace the DB file, start again.
+      </p>
+      {files.map((f) => (
+        <div key={f.name} className="flex justify-between border-t border-border py-1 text-xs">
+          <span className="font-mono">{f.name}</span>
+          <span className="text-muted-foreground">
+            {fmtSize(f.size)} · {new Date(f.mtime).toLocaleString()}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function UsersPage() {
   const qc = useQueryClient()
   const [me, setMe] = useState<{ username: string | null; role: string | null } | null>(null)
-  const [form, setForm] = useState({ username: "", password: "", role: "viewer" })
+  const [form, setForm] = useState({
+    username: "",
+    password: "",
+    role: "viewer",
+    group: "",
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [deleting, setDeleting] = useState<UserRow | null>(null)
   const [resetting, setResetting] = useState<UserRow | null>(null)
@@ -60,7 +193,10 @@ function UsersPage() {
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        group: form.role === "admin" && form.group.trim() ? form.group.trim() : null,
+      }),
     })
     const j = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -69,7 +205,7 @@ function UsersPage() {
       return
     }
     toast.success(`User "${form.username}" created`)
-    setForm({ username: "", password: "", role: "viewer" })
+    setForm({ username: "", password: "", role: "viewer", group: "" })
     setErrors({})
     refresh()
   }
@@ -134,7 +270,7 @@ function UsersPage() {
         <h1 className="text-2xl font-bold">Users</h1>
         <p className="text-muted-foreground">
           Accounts for the web UI. Admins manage configuration; viewers are
-          read-only.
+          read-only. Group admins may only manage the nodes of their group.
         </p>
       </div>
 
@@ -167,6 +303,11 @@ function UsersPage() {
                   <Badge variant={u.role === "admin" ? "default" : "secondary"}>
                     {u.role}
                   </Badge>
+                  {u.group && (
+                    <Badge variant="info" className="ml-1">
+                      group {u.group}
+                    </Badge>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex justify-end gap-1">
@@ -251,11 +392,29 @@ function UsersPage() {
               </SelectContent>
             </Select>
           </div>
+          {form.role === "admin" && (
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">
+                Node group (optional)
+              </Label>
+              <Input
+                value={form.group}
+                onChange={(e) => setForm({ ...form, group: e.target.value })}
+                placeholder="all groups"
+                className="w-36"
+                aria-label="user group"
+              />
+            </div>
+          )}
           <Button onClick={createMut} className="mt-5">
             Create user
           </Button>
         </div>
       </div>
+
+      <SessionsCard />
+
+      <BackupsCard />
 
       <ConfirmDialog
         open={Boolean(deleting)}

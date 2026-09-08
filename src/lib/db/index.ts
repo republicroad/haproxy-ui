@@ -127,6 +127,16 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_logs_ts ON log_records(ts);
   CREATE INDEX IF NOT EXISTS idx_logs_node_ts ON log_records(node_id, ts);
+  CREATE TABLE IF NOT EXISTS user_sessions (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    ip TEXT,
+    user_agent TEXT,
+    revoked INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(username, last_seen);
   CREATE TABLE IF NOT EXISTS upgrade_runs (
     id TEXT PRIMARY KEY,
     node_id TEXT NOT NULL,
@@ -149,6 +159,16 @@ try {
 }
 try {
   db.exec("ALTER TABLE nodes ADD COLUMN node_group TEXT")
+} catch {
+  // already migrated
+}
+try {
+  db.exec("ALTER TABLE api_tokens ADD COLUMN scope TEXT NOT NULL DEFAULT 'all'")
+} catch {
+  // already migrated
+}
+try {
+  db.exec("ALTER TABLE users ADD COLUMN user_group TEXT")
 } catch {
   // already migrated
 }
@@ -584,43 +604,49 @@ export type UserRow = {
   username: string
   passHash: string
   role: "admin" | "viewer"
+  /** When set, an admin-role user may only manage nodes in this group. */
+  group: string | null
   createdAt: number
 }
 
 export function listUsers(): Omit<UserRow, "passHash">[] {
   return (
     db
-      .prepare("SELECT username, role, created_at FROM users ORDER BY created_at ASC")
-      .all() as { username: string; role: string; created_at: number }[]
+      .prepare(
+        "SELECT username, role, user_group, created_at FROM users ORDER BY created_at ASC",
+      )
+      .all() as { username: string; role: string; user_group: string | null; created_at: number }[]
   ).map((r) => ({
     username: r.username,
     role: r.role as "admin" | "viewer",
+    group: r.user_group ?? null,
     createdAt: r.created_at,
   }))
 }
 
 export function getUser(username: string): UserRow | undefined {
   const row = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as
-    | { username: string; pass_hash: string; role: string; created_at: number }
+    | { username: string; pass_hash: string; role: string; created_at: number; user_group: string | null }
     | undefined
   if (!row) return undefined
   return {
     username: row.username,
     passHash: row.pass_hash,
     role: row.role as "admin" | "viewer",
+    group: row.user_group ?? null,
     createdAt: row.created_at,
   }
 }
 
 export function insertUser(u: Omit<UserRow, "createdAt">): void {
   db.prepare(
-    "INSERT INTO users (username, pass_hash, role, created_at) VALUES (?, ?, ?, ?)",
-  ).run(u.username, u.passHash, u.role, Date.now())
+    "INSERT INTO users (username, pass_hash, role, created_at, user_group) VALUES (?, ?, ?, ?, ?)",
+  ).run(u.username, u.passHash, u.role, Date.now(), u.group)
 }
 
 export function updateUser(
   username: string,
-  patch: { passHash?: string; role?: "admin" | "viewer" },
+  patch: { passHash?: string; role?: "admin" | "viewer"; group?: string | null },
 ): void {
   const sets: string[] = []
   const vals: unknown[] = []
@@ -632,10 +658,14 @@ export function updateUser(
     sets.push("role = ?")
     vals.push(patch.role)
   }
+  if (patch.group !== undefined) {
+    sets.push("user_group = ?")
+    vals.push(patch.group)
+  }
   if (sets.length === 0) return
   vals.push(username)
   db.prepare(`UPDATE users SET ${sets.join(", ")} WHERE username = ?`).run(
-    ...(vals as (string | number)[]),
+    ...(vals as (string | number | null)[]),
   )
 }
 
@@ -648,6 +678,8 @@ export type ApiTokenRow = {
   name: string
   tokenHash: string
   role: "admin" | "viewer"
+  /** 'all' | 'readonly' | 'group:<name>' */
+  scope: string
   createdAt: number
   lastUsed: number | null
 }
@@ -656,13 +688,14 @@ export function listApiTokens(): Omit<ApiTokenRow, "tokenHash">[] {
   return (
     db
       .prepare(
-        "SELECT id, name, role, created_at, last_used FROM api_tokens ORDER BY created_at DESC",
+        "SELECT id, name, role, scope, created_at, last_used FROM api_tokens ORDER BY created_at DESC",
       )
-      .all() as { id: string; name: string; role: string; created_at: number; last_used: number | null }[]
+      .all() as { id: string; name: string; role: string; scope: string; created_at: number; last_used: number | null }[]
   ).map((r) => ({
     id: r.id,
     name: r.name,
     role: r.role as "admin" | "viewer",
+    scope: r.scope ?? "all",
     createdAt: r.created_at,
     lastUsed: r.last_used,
   }))
@@ -670,15 +703,16 @@ export function listApiTokens(): Omit<ApiTokenRow, "tokenHash">[] {
 
 export function getApiTokenByHash(tokenHash: string): Omit<ApiTokenRow, "tokenHash"> | undefined {
   const row = db
-    .prepare("SELECT id, name, role, created_at, last_used FROM api_tokens WHERE token_hash = ?")
+    .prepare("SELECT id, name, role, scope, created_at, last_used FROM api_tokens WHERE token_hash = ?")
     .get(tokenHash) as
-    | { id: string; name: string; role: string; created_at: number; last_used: number | null }
+    | { id: string; name: string; role: string; scope: string; created_at: number; last_used: number | null }
     | undefined
   if (!row) return undefined
   return {
     id: row.id,
     name: row.name,
     role: row.role as "admin" | "viewer",
+    scope: row.scope ?? "all",
     createdAt: row.created_at,
     lastUsed: row.last_used,
   }
@@ -686,8 +720,8 @@ export function getApiTokenByHash(tokenHash: string): Omit<ApiTokenRow, "tokenHa
 
 export function insertApiToken(t: Omit<ApiTokenRow, "lastUsed">): void {
   db.prepare(
-    "INSERT INTO api_tokens (id, name, token_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
-  ).run(t.id, t.name, t.tokenHash, t.role, t.createdAt)
+    "INSERT INTO api_tokens (id, name, token_hash, role, scope, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run(t.id, t.name, t.tokenHash, t.role, t.scope, t.createdAt)
 }
 
 export function deleteApiToken(id: string): void {
@@ -1058,5 +1092,83 @@ export function listUpgradeRuns(nodeId: string, limit = 20): Omit<UpgradeRun, "i
     toVersion: r.to_version,
     result: r.result,
     actor: r.actor,
+  }))
+}
+
+// --- session registry (active-session management + revocation) ---
+
+export type SessionRecord = {
+  id: string // SHA-256 of the session token
+  username: string
+  createdAt: number
+  lastSeen: number
+  ip: string | null
+  userAgent: string | null
+  revoked: boolean
+}
+
+export function getSessionRecord(id: string): SessionRecord | undefined {
+  const row = db.prepare("SELECT * FROM user_sessions WHERE id = ?").get(id) as
+    | { id: string; username: string; created_at: number; last_seen: number; ip: string | null; user_agent: string | null; revoked: number }
+    | undefined
+  if (!row) return undefined
+  return {
+    id: row.id,
+    username: row.username,
+    createdAt: row.created_at,
+    lastSeen: row.last_seen,
+    ip: row.ip,
+    userAgent: row.user_agent,
+    revoked: row.revoked === 1,
+  }
+}
+
+export function registerSession(r: {
+  id: string
+  username: string
+  ip: string | null
+  userAgent: string | null
+}): void {
+  const now = Date.now()
+  db.prepare(
+    "INSERT INTO user_sessions (id, username, created_at, last_seen, ip, user_agent, revoked) VALUES (?, ?, ?, ?, ?, ?, 0)",
+  ).run(r.id, r.username, now, now, r.ip, r.userAgent)
+}
+
+/** Throttled last_seen refresh (at most once a minute per session). */
+export function touchSession(id: string): void {
+  db.prepare(
+    "UPDATE user_sessions SET last_seen = ? WHERE id = ? AND revoked = 0 AND last_seen < ?",
+  ).run(Date.now(), id, Date.now() - 60_000)
+}
+
+export function revokeSession(id: string): void {
+  db.prepare("UPDATE user_sessions SET revoked = 1 WHERE id = ?").run(id)
+}
+
+/** Non-revoked sessions, most recently active first (7-day session TTL). */
+export function listActiveSessions(): SessionRecord[] {
+  const cutoff = Date.now() - 7 * 86_400_000
+  const rows = db
+    .prepare(
+      "SELECT * FROM user_sessions WHERE revoked = 0 AND last_seen >= ? ORDER BY last_seen DESC",
+    )
+    .all(cutoff) as {
+    id: string
+    username: string
+    created_at: number
+    last_seen: number
+    ip: string | null
+    user_agent: string | null
+    revoked: number
+  }[]
+  return rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    createdAt: r.created_at,
+    lastSeen: r.last_seen,
+    ip: r.ip,
+    userAgent: r.user_agent,
+    revoked: r.revoked === 1,
   }))
 }

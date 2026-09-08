@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { hashPassword, roleFromRequest } from "#/lib/auth"
+import { hashPassword, isGlobalAdmin } from "#/lib/auth"
 import { getUser, insertUser, listUsers } from "#/lib/db"
 import { publish } from "#/lib/events"
 import { z } from "zod"
@@ -14,19 +14,27 @@ const createSchema = z.object({
     .regex(/^[A-Za-z0-9_.-]+$/, "letters, digits, _ . - only"),
   password: z.string().min(6, "password must be at least 6 characters"),
   role: z.enum(["admin", "viewer"]).default("viewer"),
+  /** Restrict admin-role users to a single node group (group admin). */
+  group: z
+    .string()
+    .trim()
+    .max(32)
+    .regex(/^[A-Za-z0-9_.-]+$/, "letters, digits, _ . - only")
+    .nullable()
+    .optional(),
 })
 
 export const Route = createFileRoute("/api/users")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (roleFromRequest(request) !== "admin") {
+        if (!isGlobalAdmin(request)) {
           return Response.json({ error: "forbidden" }, { status: 403 })
         }
         return Response.json(listUsers())
       },
       POST: async ({ request }) => {
-        if (roleFromRequest(request) !== "admin") {
+        if (!isGlobalAdmin(request)) {
           return Response.json({ error: "forbidden" }, { status: 403 })
         }
         let body: unknown
@@ -49,6 +57,7 @@ export const Route = createFileRoute("/api/users")({
           username: parsed.data.username,
           passHash: hashPassword(parsed.data.password),
           role: parsed.data.role,
+          group: parsed.data.group ?? null,
         })
         publish({ type: "users_changed" })
         return Response.json({ ok: true, username: parsed.data.username }, { status: 201 })

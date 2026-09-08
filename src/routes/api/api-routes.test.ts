@@ -362,6 +362,7 @@ describe("auth + RBAC matrix", () => {
         username: "viewer1",
         passHash: auth.hashPassword("pw123456"),
         role: "viewer",
+        group: null,
       })
       const adminToken = auth.createSessionToken("boss")
       const viewerToken = auth.createSessionToken("viewer1")
@@ -472,6 +473,131 @@ describe("auth + RBAC matrix", () => {
       expect(auth.loginAllowed(ip)).toBe(true)
       for (let i = 0; i < 5; i++) auth.recordLoginFailure(ip)
       expect(auth.loginAllowed(ip)).toBe(false)
+    })
+  })
+
+  describe("identity scopes (token + group admin)", () => {
+    let mw: { authMiddleware: { options: { server: CallableFunction } } }
+    const okNext = new Response("{}", { status: 200 })
+    const statusOf = async (req: Request) => {
+      const out = (await mw.authMiddleware.options.server({
+        request: req,
+        pathname: new URL(req.url).pathname,
+        context: {},
+        next: async () => okNext,
+        handlerType: "router",
+      })) as Response | { response: Response }
+      return (out instanceof Response ? out : out.response).status
+    }
+
+    beforeAll(async () => {
+      process.env.HAPROXY_UI_USER = "boss"
+      process.env.HAPROXY_UI_PASS = "secret123"
+      mw = (await import("#/middleware")) as unknown as {
+        authMiddleware: { options: { server: CallableFunction } }
+      }
+    })
+
+    it("read-only tokens cannot write even with the admin role", async () => {
+      const token = auth.mintApiToken("ro-ci", "admin", "readonly")
+      const req = (method: string) =>
+        new Request("http://ui.local/api/nodes", {
+          method,
+          headers: { authorization: `Bearer ${token.token}` },
+        })
+      expect(await statusOf(req("GET"))).toBe(200)
+      expect(await statusOf(req("POST"))).toBe(403)
+      expect(auth.scopeFromRequest(req("GET")).kind).toBe("readonly")
+    })
+
+    it("group-scoped tokens pass in-group nodes and are denied elsewhere", async () => {
+      db.insertNode({ ...nodeRow("g1", "http://127.0.0.1:1"), group: "edge" })
+      db.insertNode({ ...nodeRow("g2", "http://127.0.0.1:2"), group: "core" })
+      const token = auth.mintApiToken("edge-ci", "admin", "group:edge")
+      const hit = (id: string) =>
+        new Request(`http://ui.local/api/dp/${id}/services`, {
+          headers: { authorization: `Bearer ${token.token}` },
+        })
+      expect(await statusOf(hit("g1"))).toBe(200)
+      expect(await statusOf(hit("g2"))).toBe(403)
+      // fleet-wide endpoints are out of scope for group identities
+      expect(
+        await statusOf(
+          new Request("http://ui.local/api/nodes/export", {
+            headers: { authorization: `Bearer ${token.token}` },
+          }),
+        ),
+      ).toBe(403)
+    })
+
+    it("group admins (users with a group) are restricted like group tokens", async () => {
+      db.insertUser({
+        username: "edge-admin",
+        passHash: auth.hashPassword("pw123456"),
+        role: "admin",
+        group: "edge",
+      })
+      const cookie = auth.createSessionToken("edge-admin")
+      const hit = (url: string) =>
+        new Request(url, { headers: { cookie: `hui_session=${cookie}` } })
+      expect(await statusOf(hit("http://ui.local/api/dp/g1/services"))).toBe(200)
+      expect(await statusOf(hit("http://ui.local/api/nodes/g2"))).toBe(403)
+      // group admins cannot mint global tokens
+      expect(
+        await statusOf(
+          new Request("http://ui.local/api/tokens", {
+            headers: { cookie: `hui_session=${cookie}` },
+          }),
+        ),
+      ).toBe(403)
+    })
+
+    it("tracks sessions in the registry and honors per-session revocation", async () => {
+      const token = auth.createSessionToken("boss")
+      const req = new Request("http://ui.local/api/nodes", {
+        headers: { cookie: `hui_session=${token}` },
+      })
+      expect(auth.identityFromRequest(req)).not.toBeNull()
+      const id = auth.sessionTokenId(token)
+      const listed = db.listActiveSessions()
+      expect(listed.some((s) => s.id === id)).toBe(true)
+      db.revokeSession(id)
+      expect(auth.identityFromRequest(req)).toBeNull()
+    })
+  })
+
+  describe("database backups", () => {
+    it("VACUUM INTO writes a snapshot file and lists it (global admin only)", async () => {
+      process.env.HAPROXY_UI_BACKUP_DIR = join(mkdtempSync(join(tmpdir(), "hui-bak-")), "bak")
+      db.insertUser({
+        username: "root-admin",
+        passHash: auth.hashPassword("pw123456"),
+        role: "admin",
+        group: null,
+      })
+      const { Route } = (await import("./db/backup")) as unknown as {
+        Route: { options: { server: { handlers: Record<string, CallableFunction> } } }
+      }
+      const adminCookie = {
+        cookie: `hui_session=${auth.createSessionToken("root-admin")}`,
+      }
+      const anon = (await Route.options.server.handlers.POST({
+        request: new Request("http://x/api/db/backup", { method: "POST" }),
+      })) as Response
+      expect(anon.status).toBe(403)
+      const post = (await Route.options.server.handlers.POST({
+        request: new Request("http://x/api/db/backup", {
+          method: "POST",
+          headers: adminCookie,
+        }),
+      })) as Response
+      expect(post.status).toBe(201)
+      const get = (await Route.options.server.handlers.GET({
+        request: new Request("http://x/api/db/backup", { headers: adminCookie }),
+      })) as Response
+      const body = (await get.json()) as { files: { name: string }[] }
+      expect(body.files.length).toBe(1)
+      expect(body.files[0].name.startsWith("haproxy-ui-")).toBe(true)
     })
   })
 })

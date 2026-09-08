@@ -19,6 +19,7 @@ import { Route as ApiLogsRouteImport } from './routes/api/logs'
 import { Route as ApiMetricsRouteImport } from './routes/api/metrics'
 import { Route as ApiNodesRouteImport } from './routes/api/nodes'
 import { Route as ApiOpenapiRouteImport } from './routes/api/openapi'
+import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiTokensRouteImport } from './routes/api/tokens'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as NodesIndexRouteImport } from './routes/nodes.index'
@@ -28,12 +29,14 @@ import { Route as ApiAlertsTestRouteImport } from './routes/api/alerts/test'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthStatusRouteImport } from './routes/api/auth/status'
+import { Route as ApiDbBackupRouteImport } from './routes/api/db/backup'
 import { Route as ApiHealthSummaryRouteImport } from './routes/api/health/summary'
 import { Route as ApiLogsStatsRouteImport } from './routes/api/logs.stats'
 import { Route as ApiNodesIdRouteImport } from './routes/api/nodes/$id'
 import { Route as ApiNodesDiffRouteImport } from './routes/api/nodes.diff'
 import { Route as ApiNodesExportRouteImport } from './routes/api/nodes.export'
 import { Route as ApiNodesImportRouteImport } from './routes/api/nodes.import'
+import { Route as ApiSessionsIdRouteImport } from './routes/api/sessions/$id'
 import { Route as ApiTokensIdRouteImport } from './routes/api/tokens/$id'
 import { Route as ApiUsersUsernameRouteImport } from './routes/api/users/$username'
 import { Route as ApiAuthOidcCallbackRouteImport } from './routes/api/auth/oidc/callback'
@@ -99,6 +102,11 @@ const ApiOpenapiRoute = ApiOpenapiRouteImport.update({
   path: '/api/openapi',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionsRoute = ApiSessionsRouteImport.update({
+  id: '/api/sessions',
+  path: '/api/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTokensRoute = ApiTokensRouteImport.update({
   id: '/api/tokens',
   path: '/api/tokens',
@@ -144,6 +152,11 @@ const ApiAuthStatusRoute = ApiAuthStatusRouteImport.update({
   path: '/api/auth/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDbBackupRoute = ApiDbBackupRouteImport.update({
+  id: '/api/db/backup',
+  path: '/api/db/backup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthSummaryRoute = ApiHealthSummaryRouteImport.update({
   id: '/api/health/summary',
   path: '/api/health/summary',
@@ -173,6 +186,11 @@ const ApiNodesImportRoute = ApiNodesImportRouteImport.update({
   id: '/import',
   path: '/import',
   getParentRoute: () => ApiNodesRoute,
+} as any)
+const ApiSessionsIdRoute = ApiSessionsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiSessionsRoute,
 } as any)
 const ApiTokensIdRoute = ApiTokensIdRouteImport.update({
   id: '/$id',
@@ -258,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/api/metrics': typeof ApiMetricsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/openapi': typeof ApiOpenapiRoute
+  '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
@@ -267,12 +286,14 @@ export interface FileRoutesByFullPath {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
+  '/api/db/backup': typeof ApiDbBackupRoute
   '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/logs/stats': typeof ApiLogsStatsRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/sessions/$id': typeof ApiSessionsIdRoute
   '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
@@ -298,6 +319,7 @@ export interface FileRoutesByTo {
   '/api/metrics': typeof ApiMetricsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/openapi': typeof ApiOpenapiRoute
+  '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
@@ -307,12 +329,14 @@ export interface FileRoutesByTo {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
+  '/api/db/backup': typeof ApiDbBackupRoute
   '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/logs/stats': typeof ApiLogsStatsRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/sessions/$id': typeof ApiSessionsIdRoute
   '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
@@ -340,6 +364,7 @@ export interface FileRoutesById {
   '/api/metrics': typeof ApiMetricsRoute
   '/api/nodes': typeof ApiNodesRouteWithChildren
   '/api/openapi': typeof ApiOpenapiRoute
+  '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/api/tokens': typeof ApiTokensRouteWithChildren
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
@@ -349,12 +374,14 @@ export interface FileRoutesById {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/status': typeof ApiAuthStatusRoute
+  '/api/db/backup': typeof ApiDbBackupRoute
   '/api/health/summary': typeof ApiHealthSummaryRoute
   '/api/logs/stats': typeof ApiLogsStatsRoute
   '/api/nodes/$id': typeof ApiNodesIdRouteWithChildren
   '/api/nodes/diff': typeof ApiNodesDiffRoute
   '/api/nodes/export': typeof ApiNodesExportRoute
   '/api/nodes/import': typeof ApiNodesImportRoute
+  '/api/sessions/$id': typeof ApiSessionsIdRoute
   '/api/tokens/$id': typeof ApiTokensIdRoute
   '/api/users/$username': typeof ApiUsersUsernameRoute
   '/api/auth/oidc/callback': typeof ApiAuthOidcCallbackRoute
@@ -383,6 +410,7 @@ export interface FileRouteTypes {
     | '/api/metrics'
     | '/api/nodes'
     | '/api/openapi'
+    | '/api/sessions'
     | '/api/tokens'
     | '/api/users'
     | '/nodes/$id'
@@ -392,12 +420,14 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
+    | '/api/db/backup'
     | '/api/health/summary'
     | '/api/logs/stats'
     | '/api/nodes/$id'
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/sessions/$id'
     | '/api/tokens/$id'
     | '/api/users/$username'
     | '/api/auth/oidc/callback'
@@ -423,6 +453,7 @@ export interface FileRouteTypes {
     | '/api/metrics'
     | '/api/nodes'
     | '/api/openapi'
+    | '/api/sessions'
     | '/api/tokens'
     | '/api/users'
     | '/nodes/$id'
@@ -432,12 +463,14 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
+    | '/api/db/backup'
     | '/api/health/summary'
     | '/api/logs/stats'
     | '/api/nodes/$id'
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/sessions/$id'
     | '/api/tokens/$id'
     | '/api/users/$username'
     | '/api/auth/oidc/callback'
@@ -464,6 +497,7 @@ export interface FileRouteTypes {
     | '/api/metrics'
     | '/api/nodes'
     | '/api/openapi'
+    | '/api/sessions'
     | '/api/tokens'
     | '/api/users'
     | '/nodes/$id'
@@ -473,12 +507,14 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/status'
+    | '/api/db/backup'
     | '/api/health/summary'
     | '/api/logs/stats'
     | '/api/nodes/$id'
     | '/api/nodes/diff'
     | '/api/nodes/export'
     | '/api/nodes/import'
+    | '/api/sessions/$id'
     | '/api/tokens/$id'
     | '/api/users/$username'
     | '/api/auth/oidc/callback'
@@ -506,6 +542,7 @@ export interface RootRouteChildren {
   ApiMetricsRoute: typeof ApiMetricsRoute
   ApiNodesRoute: typeof ApiNodesRouteWithChildren
   ApiOpenapiRoute: typeof ApiOpenapiRoute
+  ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiTokensRoute: typeof ApiTokensRouteWithChildren
   ApiUsersRoute: typeof ApiUsersRouteWithChildren
   ApiAlertsSettingsRoute: typeof ApiAlertsSettingsRoute
@@ -513,6 +550,7 @@ export interface RootRouteChildren {
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthStatusRoute: typeof ApiAuthStatusRoute
+  ApiDbBackupRoute: typeof ApiDbBackupRoute
   ApiHealthSummaryRoute: typeof ApiHealthSummaryRoute
   ApiAuthOidcCallbackRoute: typeof ApiAuthOidcCallbackRoute
   ApiAuthOidcStartRoute: typeof ApiAuthOidcStartRoute
@@ -592,6 +630,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOpenapiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sessions': {
+      id: '/api/sessions'
+      path: '/api/sessions'
+      fullPath: '/api/sessions'
+      preLoaderRoute: typeof ApiSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tokens': {
       id: '/api/tokens'
       path: '/api/tokens'
@@ -655,6 +700,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/db/backup': {
+      id: '/api/db/backup'
+      path: '/api/db/backup'
+      fullPath: '/api/db/backup'
+      preLoaderRoute: typeof ApiDbBackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health/summary': {
       id: '/api/health/summary'
       path: '/api/health/summary'
@@ -696,6 +748,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/nodes/import'
       preLoaderRoute: typeof ApiNodesImportRouteImport
       parentRoute: typeof ApiNodesRoute
+    }
+    '/api/sessions/$id': {
+      id: '/api/sessions/$id'
+      path: '/$id'
+      fullPath: '/api/sessions/$id'
+      preLoaderRoute: typeof ApiSessionsIdRouteImport
+      parentRoute: typeof ApiSessionsRoute
     }
     '/api/tokens/$id': {
       id: '/api/tokens/$id'
@@ -886,6 +945,18 @@ const ApiNodesRouteWithChildren = ApiNodesRoute._addFileChildren(
   ApiNodesRouteChildren,
 )
 
+interface ApiSessionsRouteChildren {
+  ApiSessionsIdRoute: typeof ApiSessionsIdRoute
+}
+
+const ApiSessionsRouteChildren: ApiSessionsRouteChildren = {
+  ApiSessionsIdRoute: ApiSessionsIdRoute,
+}
+
+const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
+  ApiSessionsRouteChildren,
+)
+
 interface ApiTokensRouteChildren {
   ApiTokensIdRoute: typeof ApiTokensIdRoute
 }
@@ -921,6 +992,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMetricsRoute: ApiMetricsRoute,
   ApiNodesRoute: ApiNodesRouteWithChildren,
   ApiOpenapiRoute: ApiOpenapiRoute,
+  ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiTokensRoute: ApiTokensRouteWithChildren,
   ApiUsersRoute: ApiUsersRouteWithChildren,
   ApiAlertsSettingsRoute: ApiAlertsSettingsRoute,
@@ -928,6 +1000,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthLoginRoute: ApiAuthLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthStatusRoute: ApiAuthStatusRoute,
+  ApiDbBackupRoute: ApiDbBackupRoute,
   ApiHealthSummaryRoute: ApiHealthSummaryRoute,
   ApiAuthOidcCallbackRoute: ApiAuthOidcCallbackRoute,
   ApiAuthOidcStartRoute: ApiAuthOidcStartRoute,
@@ -937,13 +1010,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

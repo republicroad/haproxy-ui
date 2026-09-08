@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { hashPassword, roleFromRequest } from "#/lib/auth"
+import { hashPassword, isGlobalAdmin } from "#/lib/auth"
 import {
   countAdmins,
   deleteUser,
@@ -13,13 +13,20 @@ import { fieldErrors } from "#/lib/schemas"
 const patchSchema = z.object({
   password: z.string().min(6).optional(),
   role: z.enum(["admin", "viewer"]).optional(),
+  group: z
+    .string()
+    .trim()
+    .max(32)
+    .regex(/^[A-Za-z0-9_.-]+$/, "letters, digits, _ . - only")
+    .nullable()
+    .optional(),
 })
 
 export const Route = createFileRoute("/api/users/$username")({
   server: {
     handlers: {
       PUT: async ({ params, request }) => {
-        if (roleFromRequest(request) !== "admin") {
+        if (!isGlobalAdmin(request)) {
           return Response.json({ error: "forbidden" }, { status: 403 })
         }
         const existing = getUser(params.username)
@@ -49,6 +56,7 @@ export const Route = createFileRoute("/api/users/$username")({
         }
         updateUser(params.username, {
           role: parsed.data.role,
+          group: parsed.data.group,
           passHash:
             parsed.data.password !== undefined
               ? hashPassword(parsed.data.password)
@@ -58,7 +66,7 @@ export const Route = createFileRoute("/api/users/$username")({
         return Response.json({ ok: true })
       },
       DELETE: async ({ params, request }) => {
-        if (roleFromRequest(request) !== "admin") {
+        if (!isGlobalAdmin(request)) {
           return Response.json({ error: "forbidden" }, { status: 403 })
         }
         const existing = getUser(params.username)

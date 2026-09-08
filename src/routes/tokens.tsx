@@ -19,14 +19,26 @@ type TokenRow = {
   id: string
   name: string
   role: "admin" | "viewer"
+  scope: string
   createdAt: number
   lastUsed: number | null
+}
+
+function scopeLabel(scope: string): string {
+  if (scope === "readonly") return "read-only"
+  if (scope.startsWith("group:")) return `group ${scope.slice(6)}`
+  return "full access"
 }
 
 function TokensPage() {
   const qc = useQueryClient()
   const [me, setMe] = useState<{ role: string | null } | null>(null)
-  const [form, setForm] = useState({ name: "", role: "viewer" })
+  const [form, setForm] = useState({
+    name: "",
+    role: "viewer",
+    scopeKind: "all",
+    group: "",
+  })
   const [minted, setMinted] = useState<{ name: string; token: string } | null>(null)
   const [deleting, setDeleting] = useState<TokenRow | null>(null)
   const [copied, setCopied] = useState(false)
@@ -66,7 +78,7 @@ function TokensPage() {
       return
     }
     setMinted({ name: j.name, token: j.token })
-    setForm({ name: "", role: "viewer" })
+    setForm({ name: "", role: "viewer", scopeKind: "all", group: "" })
     refresh()
   }
 
@@ -146,6 +158,7 @@ function TokensPage() {
             <tr>
               <th className="px-3 py-2">Name</th>
               <th className="px-3 py-2">Role</th>
+              <th className="px-3 py-2">Scope</th>
               <th className="px-3 py-2">Last used</th>
               <th className="px-3 py-2"></th>
             </tr>
@@ -166,6 +179,11 @@ function TokensPage() {
                     {t.role}
                   </Badge>
                 </td>
+                <td className="px-3 py-2">
+                  <Badge variant={t.scope === "all" ? "outline" : "info"}>
+                    {scopeLabel(t.scope)}
+                  </Badge>
+                </td>
                 <td className="px-3 py-2 text-muted-foreground">
                   {t.lastUsed ? new Date(t.lastUsed).toLocaleString() : "never"}
                 </td>
@@ -178,7 +196,7 @@ function TokensPage() {
             ))}
             {!q.isLoading && tokens.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-3 text-muted-foreground">
+                <td colSpan={5} className="px-3 py-3 text-muted-foreground">
                   No API tokens yet.
                 </td>
               </tr>
@@ -212,10 +230,45 @@ function TokensPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={createMut} disabled={!form.name}>
+          <div>
+            <Label className="mb-1 block text-xs text-muted-foreground">Scope</Label>
+            <Select
+              value={form.scopeKind}
+              onValueChange={(v) => setForm({ ...form, scopeKind: v ?? "all" })}
+            >
+              <SelectTrigger className="w-[150px]" aria-label="token scope">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">full access</SelectItem>
+                <SelectItem value="readonly">read-only</SelectItem>
+                <SelectItem value="group">node group…</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.scopeKind === "group" && (
+            <div>
+              <Label className="mb-1 block text-xs text-muted-foreground">Group</Label>
+              <Input
+                value={form.group}
+                onChange={(e) => setForm({ ...form, group: e.target.value })}
+                placeholder="edge"
+                className="w-36"
+                aria-label="token group"
+              />
+            </div>
+          )}
+          <Button
+            onClick={createMut}
+            disabled={!form.name || (form.scopeKind === "group" && !form.group.trim())}
+          >
             Create token
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Read-only tokens cannot perform any write, group tokens act like an
+          admin but only for nodes in the given group.
+        </p>
       </div>
 
       <ConfirmDialog

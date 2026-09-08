@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { insertNode, listNodes } from "#/lib/db"
+import { scopeFromRequest } from "#/lib/auth"
 import { nodeInputSchema, fieldErrors } from "#/lib/schemas"
 
 export const Route = createFileRoute("/api/nodes")({
   server: {
     handlers: {
-      GET: async () => {
-        return Response.json(listNodes())
+      GET: async ({ request }) => {
+        const scope = scopeFromRequest(request)
+        // group-scoped identities only see their own group's nodes
+        const nodes =
+          scope.kind === "group"
+            ? listNodes().filter((n) => n.group === scope.group)
+            : listNodes()
+        return Response.json(nodes)
       },
       POST: async ({ request }) => {
         let body: unknown

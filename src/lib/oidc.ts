@@ -176,6 +176,7 @@ export function provisionUser(cfg: OidcConfig, claims: Record<string, unknown>):
       // password logins stay impossible: unguessable scrypt hash
       passHash: hashPassword(randomBytes(32).toString("hex")),
       role: shouldBeAdmin ? "admin" : "viewer",
+      group: null,
     })
   } else if (shouldBeAdmin && existing.role !== "admin") {
     updateUser(username, { role: "admin" })

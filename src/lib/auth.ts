@@ -2,9 +2,13 @@ import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from
 import {
   getApiTokenByHash,
   getUser,
+  getSessionRecord,
   insertApiToken,
   listUsers,
+  registerSession,
+  revokeSession,
   touchApiToken,
+  touchSession,
 } from "#/lib/db"
 import { isOidcConfigured } from "#/lib/oidcEnv"
 
@@ -13,6 +17,23 @@ const SESSION_TTL_MS = 7 * 86_400_000
 
 export type AuthMode = "users" | "env" | "off"
 export type Role = "admin" | "viewer"
+
+/**
+ * What an authenticated identity may touch:
+ *  - all:      unrestricted for its role (interactive sessions, plain tokens)
+ *  - readonly: read-only regardless of role (automation tokens)
+ *  - group:    admin-like, but only for nodes whose group matches
+ */
+export type IdentityScope =
+  | { kind: "all" }
+  | { kind: "readonly" }
+  | { kind: "group"; group: string }
+
+export type SessionInfo = {
+  username: string
+  role: Role
+  scope: IdentityScope
+}
 
 /** Which authentication backend is active. */
 export function authMode(): AuthMode {
@@ -82,8 +103,6 @@ export function revokeAllSessions(): void {
   revokedBefore = Date.now()
 }
 
-export type SessionInfo = { username: string; role: Role }
-
 export function verifySessionToken(token: string | undefined | null): SessionInfo | null {
   if (!token) return null
   const dot = token.lastIndexOf(".")
@@ -101,13 +120,17 @@ export function verifySessionToken(token: string | undefined | null): SessionInf
     if (parsed.iat !== undefined && parsed.iat <= revokedBefore) return null
     const username = typeof parsed.sub === "string" && parsed.sub ? parsed.sub : null
     if (!username) return null
-    // env single-user sessions have no DB row
+    // env single-user sessions have no DB user row
     if (username === process.env.HAPROXY_UI_USER && authMode() === "env") {
-      return { username, role: "admin" }
+      return { username, role: "admin", scope: { kind: "all" } }
     }
     const dbUser = getUser(username)
     if (!dbUser) return null
-    return { username, role: dbUser.role }
+    // group-scoped admins (B2.3): role admin but restricted to their group
+    const scope: IdentityScope = dbUser.group
+      ? { kind: "group", group: dbUser.group }
+      : { kind: "all" }
+    return { username, role: dbUser.role, scope }
   } catch {
     return null
   }
@@ -123,6 +146,36 @@ export function readSessionCookie(request: Request): string | undefined {
   return undefined
 }
 
+/** SHA-256 of a session token — the session registry key. */
+export function sessionTokenId(token: string): string {
+  return createHash("sha256").update(token).digest("hex")
+}
+
+/**
+ * Validate the session cookie against the session registry (revocation
+ * support) and refresh last_seen. Validly-signed tokens issued before the
+ * registry existed self-register, so deploying this never logs anyone out.
+ */
+export function sessionFromRequest(request: Request): SessionInfo | null {
+  const token = readSessionCookie(request)
+  const info = verifySessionToken(token)
+  if (!info || !token) return null
+  const id = sessionTokenId(token)
+  const record = getSessionRecord(id)
+  if (record?.revoked) return null
+  if (!record) {
+    registerSession({
+      id,
+      username: info.username,
+      ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+      userAgent: request.headers.get("user-agent"),
+    })
+  } else {
+    touchSession(id)
+  }
+  return info
+}
+
 export function sessionSetCookieHeader(username: string): string {
   const secure = process.env.HAPROXY_UI_COOKIE_SECURE === "true" ? "; Secure" : ""
   return `${SESSION_COOKIE}=${createSessionToken(username)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}${secure}`
@@ -132,17 +185,30 @@ export function sessionClearCookieHeader(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
 }
 
-/** Session for the current request (username + role), or null. */
-export function sessionFromRequest(request: Request): SessionInfo | null {
-  return verifySessionToken(readSessionCookie(request))
+/** Revoke the caller's session row (logout). */
+export function revokeCurrentSession(request: Request): void {
+  const token = readSessionCookie(request)
+  if (token) revokeSession(sessionTokenId(token))
 }
 
 // --- API tokens (Bearer) ---
 
-export type NewApiToken = { id: string; token: string; name: string; role: Role }
+function parseTokenScope(scope: string): IdentityScope {
+  if (scope === "readonly") return { kind: "readonly" }
+  if (scope.startsWith("group:")) return { kind: "group", group: scope.slice(6) }
+  return { kind: "all" }
+}
+
+export type NewApiToken = {
+  id: string
+  token: string
+  name: string
+  role: Role
+  scope: string
+}
 
 /** Generate a new API token; only the SHA-256 hash is stored. */
-export function mintApiToken(name: string, role: Role): NewApiToken {
+export function mintApiToken(name: string, role: Role, scope = "all"): NewApiToken {
   const token = `hui_${randomBytes(24).toString("hex")}`
   const tokenHash = createHash("sha256").update(token).digest("hex")
   const record = {
@@ -150,10 +216,11 @@ export function mintApiToken(name: string, role: Role): NewApiToken {
     name,
     tokenHash,
     role,
+    scope,
     createdAt: Date.now(),
   }
   insertApiToken(record)
-  return { id: record.id, token, name, role }
+  return { id: record.id, token, name, role, scope }
 }
 
 export function hashApiToken(token: string): string {
@@ -168,7 +235,7 @@ function bearerFromRequest(request: Request): string | null {
 
 /**
  * Resolve the caller identity: session cookie first, then API token
- * (Authorization: Bearer). Returns username-like label + role.
+ * (Authorization: Bearer). Returns username-like label + role + scope.
  */
 export function identityFromRequest(request: Request): SessionInfo | null {
   const session = sessionFromRequest(request)
@@ -178,7 +245,11 @@ export function identityFromRequest(request: Request): SessionInfo | null {
   const record = getApiTokenByHash(hashApiToken(bearer))
   if (!record) return null
   touchApiToken(record.id)
-  return { username: `token:${record.name}`, role: record.role }
+  return {
+    username: `token:${record.name}`,
+    role: record.role,
+    scope: parseTokenScope(record.scope ?? "all"),
+  }
 }
 
 /** Audit actor: signed-in username or token name when auth is on, else null. */
@@ -191,6 +262,22 @@ export function actorFromRequest(request: Request): string | null {
 export function roleFromRequest(request: Request): Role | null {
   if (!authEnabled()) return "admin"
   return identityFromRequest(request)?.role ?? null
+}
+
+/** Identity scope of the caller; unrestricted when auth is off. */
+export function scopeFromRequest(request: Request): IdentityScope {
+  if (!authEnabled()) return { kind: "all" }
+  return identityFromRequest(request)?.scope ?? { kind: "all" }
+}
+
+/**
+ * Gate for fleet-wide operations (users, tokens, backups, registry
+ * import/export): only unscoped admins may pass.
+ */
+export function isGlobalAdmin(request: Request): boolean {
+  if (!authEnabled()) return true
+  const identity = identityFromRequest(request)
+  return identity?.role === "admin" && identity.scope.kind === "all"
 }
 
 // --- hardening ---

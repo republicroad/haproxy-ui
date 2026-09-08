@@ -120,8 +120,8 @@ const run = async () => {
       name: "be_int",
       stick_table: {
         type: "ip",
-        size: "100k",
-        expire: "10s",
+        size: 100000,
+        expire: 10,
         store: ["http_req_rate(10s)"],
       },
     },
@@ -130,7 +130,7 @@ const run = async () => {
   r = await dp(
     "POST",
     `services/haproxy/configuration/backends/be_int/http_request_rules/0?transaction_id=${tx}`,
-    { type: "track-sc0", var_name: "src" },
+    { type: "track-sc", track_sc_stick_counter: 0, track_sc_key: "src" },
   )
   console.log("track rule:", r.status, r.ok ? "" : await r.clone().text())
   r = await dp(
@@ -156,7 +156,7 @@ const run = async () => {
   r = await dp("GET", "services/haproxy/configuration/backends/be_int/http_request_rules")
   const reqRules = await j(r)
   console.log("backend request rules:", r.status, JSON.stringify(reqRules))
-  if (!JSON.stringify(reqRules).includes("track-sc0")) throw new Error("track rule not persisted")
+  if (!JSON.stringify(reqRules).includes("track-sc")) throw new Error("track rule not persisted")
 
   // observability endpoints
   r = await fetch(`${BASE}/api/metrics`)

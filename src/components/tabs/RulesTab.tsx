@@ -46,7 +46,8 @@ type SwitchRule = {
 }
 
 type HttpCheck = {
-  type: "status" | "string" | "rlen"
+  // real dataplaneapi wraps expectations as {type:"expect", value:"status 200"}
+  type: string
   value?: string
 }
 
@@ -569,8 +570,8 @@ export function RulesTab({
             {
               stick_table: {
                 type: "ip",
-                size: "100k",
-                expire: `${periodSeconds}s`,
+                size: 100_000,
+                expire: periodSeconds,
                 store: [`http_req_rate(${periodSeconds}s)`],
               },
             },
@@ -579,7 +580,7 @@ export function RulesTab({
           await dpPost(
             nodeId,
             `${sub("http_request_rules")}/${existing.length}`,
-            { type: "track-sc0", var_name: "src" },
+            { type: "track-sc", track_sc_stick_counter: 0, track_sc_key: "src" },
             tx,
           )
           await dpPost(

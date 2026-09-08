@@ -1,4 +1,4 @@
-# [![v2.0.0](https://img.shields.io/badge/version-2.0.0-blue)](CHANGELOG.md)
+# [![v2.1.0](https://img.shields.io/badge/version-2.1.0-blue)](CHANGELOG.md)
 
 # HAProxy UI
 
@@ -144,6 +144,12 @@ containers).
 | `HAPROXY_UI_LOG_SAMPLE` | `100` | Access-log sampling percent (1-100) |
 | `HAPROXY_UI_LOG_KEEP` | `24` | Access-log retention hours |
 | `HAPROXY_UI_CERT_WARN_DAYS` | `30` | Certificate expiry alert threshold (daily scan) |
+| `HAPROXY_UI_ANOMALY_5XX_PCT` | `20` | Anomaly: 5xx share (%) that fires an alert |
+| `HAPROXY_UI_ANOMALY_RATE_MULT` | `5` | Anomaly: traffic spike factor vs baseline |
+| `HAPROXY_UI_ANOMALY_LATENCY_MS` | `2000` | Anomaly: absolute avg-latency threshold |
+| `HAPROXY_UI_ANOMALY_MIN_REQUESTS` | `50` | Anomaly: minimum window sample size |
+| `HAPROXY_UI_ANOMALY_COOLDOWN_MIN` | `15` | Anomaly: per-detector alert cooldown |
+| `HAPROXY_UI_BACKUP_KEEP` | `20` | DB backup snapshots to retain |
 | `HAPROXY_UI_OIDC_ISSUER` | *(unset)* | OIDC issuer (enables SSO with client id/secret) |
 | `HAPROXY_UI_OIDC_CLIENT_ID` / `_SECRET` | *(unset)* | OIDC client credentials |
 | `HAPROXY_UI_OIDC_ADMIN_EMAILS` | *(unset)* | Comma list of e-mails that get the admin role |

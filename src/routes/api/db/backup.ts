@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { db } from "#/lib/db"
 import { isGlobalAdmin } from "#/lib/auth"
@@ -17,6 +17,26 @@ function backupDir(): string {
     : resolve("backups")
   mkdirSync(dir, { recursive: true })
   return dir
+}
+
+const BACKUP_KEEP = Math.max(1, Number(process.env.HAPROXY_UI_BACKUP_KEEP ?? 20))
+
+/** Delete the oldest snapshots beyond the retention count. */
+function pruneOldBackups(dir: string): number {
+  const files = readdirSync(dir)
+    .filter((f) => f.startsWith("haproxy-ui-") && f.endsWith(".db"))
+    .map((f) => ({ f, mtime: statSync(join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)
+  let removed = 0
+  for (const { f } of files.slice(BACKUP_KEEP)) {
+    try {
+      unlinkSync(join(dir, f))
+      removed++
+    } catch {
+      // best effort
+    }
+  }
+  return removed
 }
 
 export const Route = createFileRoute("/api/db/backup")({
@@ -50,6 +70,7 @@ export const Route = createFileRoute("/api/db/backup")({
         }
         // VACUUM INTO produces a compacted, consistent snapshot while online
         db.prepare(`VACUUM INTO ?`).run(target)
+        pruneOldBackups(dir)
         const st = statSync(target)
         return Response.json(
           { ok: true, name, size: st.size, dir },

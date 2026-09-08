@@ -76,6 +76,16 @@ db.exec(`
     to_addrs TEXT NOT NULL DEFAULT '',
     enabled INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS alert_history (
+    id TEXT PRIMARY KEY,
+    ts INTEGER NOT NULL,
+    channel TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    delivered INTEGER NOT NULL,
+    node_id TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_alert_history_ts ON alert_history(ts DESC);
   CREATE TABLE IF NOT EXISTS alert_state (
     node_id TEXT PRIMARY KEY,
     last_ok INTEGER,
@@ -952,6 +962,87 @@ export function countLogRecordsSince(nodeId: string, ms: number): number {
     .prepare("SELECT COUNT(*) AS c FROM log_records WHERE node_id = ? AND ts >= ?")
     .get(nodeId, Date.now() - ms) as { c: number }
   return row.c
+}
+
+/** Aggregate one [fromTs, toTs) window of a node's logs (anomaly detection). */
+export function logWindowStats(
+  nodeId: string,
+  fromTs: number,
+  toTs: number,
+): { total: number; err5xx: number; avgTimeMs: number | null } {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS err5xx,
+              AVG(total_time_ms) AS avg_ms
+       FROM log_records WHERE node_id = ? AND ts >= ? AND ts < ?`,
+    )
+    .get(nodeId, fromTs, toTs) as {
+    total: number
+    err5xx: number | null
+    avg_ms: number | null
+  }
+  return {
+    total: row.total,
+    err5xx: row.err5xx ?? 0,
+    avgTimeMs: row.avg_ms == null ? null : Math.round(row.avg_ms),
+  }
+}
+
+// --- notification history ---
+
+export type AlertHistoryRow = {
+  id: string
+  ts: number
+  channel: string
+  kind: string
+  subject: string
+  delivered: boolean
+  nodeId: string | null
+}
+
+export function insertAlertHistory(
+  r: Omit<AlertHistoryRow, "id">,
+): void {
+  db.prepare(
+    "INSERT INTO alert_history (id, ts, channel, kind, subject, delivered, node_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run(crypto.randomUUID(), r.ts, r.channel, r.kind, r.subject, r.delivered ? 1 : 0, r.nodeId)
+}
+
+/** Most recent notifications, newest first (trimmed by the maintenance loop). */
+export function listAlertHistory(limit = 20): AlertHistoryRow[] {
+  const rows = db
+    .prepare(
+      "SELECT id, ts, channel, kind, subject, delivered, node_id FROM alert_history ORDER BY ts DESC LIMIT ?",
+    )
+    .all(limit) as {
+    id: string
+    ts: number
+    channel: string
+    kind: string
+    subject: string
+    delivered: number
+    node_id: string | null
+  }[]
+  return rows.map((r) => ({
+    id: r.id,
+    ts: r.ts,
+    channel: r.channel,
+    kind: r.kind,
+    subject: r.subject,
+    delivered: r.delivered === 1,
+    nodeId: r.node_id,
+  }))
+}
+
+/** Keep only the newest `keepCount` notification records. */
+export function trimAlertHistory(keepCount: number): number {
+  const r = db
+    .prepare(
+      "DELETE FROM alert_history WHERE id NOT IN (SELECT id FROM alert_history ORDER BY ts DESC LIMIT ?)",
+    )
+    .run(keepCount)
+  return Number(r.changes)
 }
 
 // --- access-log aggregations (request explorer summary views) ---

@@ -5,9 +5,11 @@ import {
   deleteChangesBefore,
   insertMetricSamples,
   listLatestHealthChecks,
+  logWindowStats,
   purgeMetricSamples,
   purgeLogRecords,
   setAlertState,
+  trimAlertHistory,
   trimHealthChecks,
 } from "#/lib/db"
 import { exportNodeConfig } from "#/lib/configExport"
@@ -15,6 +17,7 @@ import { proxyToNode } from "#/lib/dataplane/proxy"
 import { LOG_KEEP_HOURS, startLogIngest } from "#/lib/logIngest"
 import { alertChannelsEnabled, notifyEmail, notifyWebhook } from "#/lib/alertChannels"
 import { expiringCerts, listCertsWithExpiry } from "#/lib/certCheck"
+import { DEFAULT_THRESHOLDS, detectAnomalies, type AnomalyKind } from "#/lib/anomaly"
 import { writeFileSync, mkdirSync } from "node:fs"
 
 const INTERVAL_MS = 60 * 60 * 1000 // hourly
@@ -26,6 +29,16 @@ const HEALTH_KEEP = Number(process.env.HAPROXY_UI_HEALTH_KEEP ?? 720)
 const BACKUP_DIR = process.env.HAPROXY_UI_BACKUP_DIR
 const CERT_WARN_DAYS = Number(process.env.HAPROXY_UI_CERT_WARN_DAYS ?? 30)
 const CERT_CHECK_INTERVAL_MS = 24 * 3_600_000 // scan certificates daily
+const ANOMALY_INTERVAL_MS =
+  Number(process.env.HAPROXY_UI_ANOMALY_INTERVAL ?? 300) * 1000 // default 5 min
+const ANOMALY_COOLDOWN_MS =
+  Number(process.env.HAPROXY_UI_ANOMALY_COOLDOWN_MIN ?? 15) * 60_000
+const ANOMALY_THRESHOLDS = {
+  err5xxPct: Number(process.env.HAPROXY_UI_ANOMALY_5XX_PCT ?? DEFAULT_THRESHOLDS.err5xxPct),
+  rateMult: Number(process.env.HAPROXY_UI_ANOMALY_RATE_MULT ?? DEFAULT_THRESHOLDS.rateMult),
+  latencyMs: Number(process.env.HAPROXY_UI_ANOMALY_LATENCY_MS ?? DEFAULT_THRESHOLDS.latencyMs),
+  minRequests: Number(process.env.HAPROXY_UI_ANOMALY_MIN_REQUESTS ?? DEFAULT_THRESHOLDS.minRequests),
+}
 
 let started = false
 let lastCertCheckTs = 0
@@ -123,14 +136,64 @@ async function checkCertExpiry(upNodeIds: string[]): Promise<void> {
         `Valid to: ${cert.validTo ?? "?"}`,
       ].join("\n")
       const delivered =
-        (await notifyWebhook(text, {
-          event: cert.expired ? "cert_expired" : "cert_expiring",
-          node: { id: nodeId, name: node },
-          certificate: cert.name,
-          daysLeft: cert.daysLeft,
-          ts: Date.now(),
-        })) || (await notifyEmail(text, body))
+        (await notifyWebhook(
+          text,
+          {
+            event: cert.expired ? "cert_expired" : "cert_expiring",
+            node: { id: nodeId, name: node },
+            certificate: cert.name,
+            daysLeft: cert.daysLeft,
+            ts: Date.now(),
+          },
+          { kind: cert.expired ? "cert_expired" : "cert_expiring", nodeId },
+        )) ||
+        (await notifyEmail(text, body, {
+          kind: cert.expired ? "cert_expired" : "cert_expiring",
+          nodeId,
+        }))
       if (delivered) setAlertState(key, true, Date.now())
+    }
+  }
+}
+
+/**
+ * Rolling-window access-log anomaly detection (5xx share, traffic spike,
+ * latency spike). Per (kind, node) cooldown via the alert_state table.
+ */
+async function checkAnomalies(): Promise<void> {
+  if (!alertChannelsEnabled()) return
+  const now = Date.now()
+  for (const node of listNodes()) {
+    const current = logWindowStats(node.id, now - 5 * 60_000, now)
+    const baseline = logWindowStats(node.id, now - 35 * 60_000, now - 5 * 60_000)
+    for (const kind of detectAnomalies(current, baseline, ANOMALY_THRESHOLDS)) {
+      const key = `anom:${kind}:${node.id}`
+      const state = getAlertState(key)
+      if (now - state.lastAlertTs < ANOMALY_COOLDOWN_MS) continue
+      const label = {
+        err5xx: `5xx share ${(current.err5xx / Math.max(current.total, 1) * 100).toFixed(0)}% in the last 5 min`,
+        rate: `traffic spike: ${current.total} requests in 5 min (baseline ~${Math.round(baseline.total / 6)}/5min)`,
+        latency: `latency spike: avg ${current.avgTimeMs}ms (baseline ${baseline.avgTimeMs ?? "?"}ms)`,
+      }[kind as AnomalyKind]
+      const text = `HAProxy UI: ${node.name} — ${label}`
+      const delivered =
+        (await notifyWebhook(
+          text,
+          {
+            event: `anomaly_${kind}`,
+            node: { id: node.id, name: node.name },
+            current,
+            baseline,
+            ts: now,
+          },
+          { kind: `anomaly_${kind}`, nodeId: node.id },
+        )) ||
+        (await notifyEmail(
+          `[HAProxy UI] ${node.name}: ${kind} anomaly`,
+          [`Node: ${node.name}`, `Anomaly: ${kind}`, `Detail: ${label}`, `Window: ${new Date(now - 5 * 60_000).toLocaleTimeString()} - ${new Date(now).toLocaleTimeString()}`].join("\n"),
+          { kind: `anomaly_${kind}`, nodeId: node.id },
+        ))
+      if (delivered) setAlertState(key, true, now)
     }
   }
 }
@@ -178,6 +241,9 @@ async function runOnce(): Promise<void> {
   await checkCertExpiry(upIds).catch((e) =>
     console.error("[maintenance] cert expiry check failed:", e),
   )
+
+  // 5. notification history housekeeping
+  trimAlertHistory(200)
 }
 
 /** Idempotently start the maintenance loops (timers unref'd so they
@@ -209,6 +275,14 @@ export function startMaintenance(): void {
 
   // UDP access-log receiver (no-op unless HAPROXY_UI_LOG_PORT is set)
   startLogIngest()
+
+  // anomaly detection loop (needs ingested logs; cadence = window length)
+  setInterval(() => {
+    checkAnomalies().catch((e) => console.error("[anomaly] check failed:", e))
+  }, ANOMALY_INTERVAL_MS).unref()
+  console.log(
+    `[maintenance] anomaly detector started (interval=${ANOMALY_INTERVAL_MS / 1000}s, cooldown=${ANOMALY_COOLDOWN_MS / 60_000}min)`,
+  )
 }
 
 // Auto-start when this module is loaded on the server side (dev + prod).

@@ -311,6 +311,17 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
 
 export function FleetHealth() {
   const [alertOpen, setAlertOpen] = useState(false)
+  const historyQ = useQuery({
+    queryKey: ["alert-history"],
+    queryFn: async (): Promise<
+      { id: string; ts: number; channel: string; kind: string; subject: string; delivered: boolean }[]
+    > => {
+      const res = await fetch("/api/alerts/history?limit=10")
+      if (!res.ok) throw new Error("failed to load history")
+      return res.json()
+    },
+    refetchInterval: POLL.NODES,
+  })
   const q = useQuery({
     queryKey: ["health-summary"],
     queryFn: async (): Promise<HealthSummary> => {
@@ -362,6 +373,29 @@ export function FleetHealth() {
       </div>
 
       {alertOpen && <AlertSettingsModal onClose={() => setAlertOpen(false)} />}
+
+      {historyQ.data && historyQ.data.length > 0 && (
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Recent notifications
+          </div>
+          <div className="max-h-44 space-y-1 overflow-auto">
+            {historyQ.data.map((h) => (
+              <div key={h.id} className="flex items-center gap-2 text-xs">
+                <Badge variant={h.delivered ? "info" : "destructive"}>
+                  {h.channel}
+                </Badge>
+                <span className="min-w-0 flex-1 truncate" title={h.subject}>
+                  {h.subject}
+                </span>
+                <span className="whitespace-nowrap text-muted-foreground">
+                  {new Date(h.ts).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {q.isLoading && <p className="text-muted-foreground">Checking nodes…</p>}
 

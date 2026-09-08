@@ -1,10 +1,16 @@
-import { getAlertSettings, getSmtpSettings } from "#/lib/db"
+import { getAlertSettings, getSmtpSettings, insertAlertHistory } from "#/lib/db"
 import { sendMail } from "#/lib/smtp"
 
 /**
  * Alert delivery channels (webhook + email) shared by the health
- * transition pipeline and the certificate expiry checker.
+ * transition pipeline, the certificate checker and anomaly detection.
+ * Every send is recorded in the notification history.
  */
+
+export type NotifyMeta = {
+  kind: string
+  nodeId?: string | null
+}
 
 /** Whether at least one delivery channel is configured and enabled. */
 export function alertChannelsEnabled(): boolean {
@@ -20,9 +26,11 @@ export function alertChannelsEnabled(): boolean {
 export async function notifyWebhook(
   text: string,
   extra: Record<string, unknown> = {},
+  meta: NotifyMeta = { kind: "generic" },
 ): Promise<boolean> {
   const { webhookUrl, enabled } = getAlertSettings()
   if (!enabled || !webhookUrl) return false
+  let delivered = false
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
@@ -30,16 +38,30 @@ export async function notifyWebhook(
       body: JSON.stringify({ text, ...extra }),
       signal: AbortSignal.timeout(5000),
     })
-    return res.ok
+    delivered = res.ok
   } catch {
-    return false
+    delivered = false
   }
+  insertAlertHistory({
+    ts: Date.now(),
+    channel: "webhook",
+    kind: meta.kind,
+    subject: text.slice(0, 200),
+    delivered,
+    nodeId: meta.nodeId ?? null,
+  })
+  return delivered
 }
 
 /** Send a plain-text email through the configured SMTP server. */
-export async function notifyEmail(subject: string, body: string): Promise<boolean> {
+export async function notifyEmail(
+  subject: string,
+  body: string,
+  meta: NotifyMeta = { kind: "generic" },
+): Promise<boolean> {
   const s = getSmtpSettings()
   if (!s.enabled || !s.host || s.toAddrs.length === 0) return false
+  let delivered = false
   try {
     await sendMail(
       {
@@ -54,8 +76,17 @@ export async function notifyEmail(subject: string, body: string): Promise<boolea
       subject,
       body,
     )
-    return true
+    delivered = true
   } catch {
-    return false
+    delivered = false
   }
+  insertAlertHistory({
+    ts: Date.now(),
+    channel: "email",
+    kind: meta.kind,
+    subject: subject.slice(0, 200),
+    delivered,
+    nodeId: meta.nodeId ?? null,
+  })
+  return delivered
 }

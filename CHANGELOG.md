@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [2.1.0] - 2026-09-09
+
+Alerting-closure release: access-log anomaly detection, a notification
+history and backup retention.
+
+### Added
+- **Access-log anomaly detection**: rolling 5-minute windows per node
+  fire webhook/email alerts on 5xx-share spikes, traffic spikes (vs the
+  preceding 30-minute baseline) and latency spikes. Thresholds are
+  configurable (HAPROXY_UI_ANOMALY_5XX_PCT, _RATE_MULT, _LATENCY_MS,
+  _MIN_REQUESTS, _COOLDOWN_MIN, _INTERVAL); every detector requires a
+  meaningful sample size.
+- **Notification history**: every webhook/email send is recorded with
+  channel, kind, subject and delivery status (alert_history, trimmed to
+  the newest 200) and shown as a Recent notifications card on the fleet
+  health dashboard.
+
+### Changed
+- Database backups now prune the oldest snapshots beyond
+  HAPROXY_UI_BACKUP_KEEP (default 20).
+
 ## [2.0.0] - 2026-09-08
 
 Fleet operations release: fine-grained token scopes, group admins,

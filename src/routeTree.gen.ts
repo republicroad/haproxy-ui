@@ -24,6 +24,7 @@ import { Route as ApiTokensRouteImport } from './routes/api/tokens'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as NodesIndexRouteImport } from './routes/nodes.index'
 import { Route as NodesIdRouteImport } from './routes/nodes.$id'
+import { Route as ApiAlertsHistoryRouteImport } from './routes/api/alerts/history'
 import { Route as ApiAlertsSettingsRouteImport } from './routes/api/alerts/settings'
 import { Route as ApiAlertsTestRouteImport } from './routes/api/alerts/test'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
@@ -127,6 +128,11 @@ const NodesIdRoute = NodesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => NodesRoute,
+} as any)
+const ApiAlertsHistoryRoute = ApiAlertsHistoryRouteImport.update({
+  id: '/api/alerts/history',
+  path: '/api/alerts/history',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAlertsSettingsRoute = ApiAlertsSettingsRouteImport.update({
   id: '/api/alerts/settings',
@@ -287,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
+  '/api/alerts/history': typeof ApiAlertsHistoryRoute
   '/api/alerts/settings': typeof ApiAlertsSettingsRoute
   '/api/alerts/test': typeof ApiAlertsTestRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
@@ -331,6 +338,7 @@ export interface FileRoutesByTo {
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes': typeof NodesIndexRoute
+  '/api/alerts/history': typeof ApiAlertsHistoryRoute
   '/api/alerts/settings': typeof ApiAlertsSettingsRoute
   '/api/alerts/test': typeof ApiAlertsTestRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
@@ -377,6 +385,7 @@ export interface FileRoutesById {
   '/api/users': typeof ApiUsersRouteWithChildren
   '/nodes/$id': typeof NodesIdRoute
   '/nodes/': typeof NodesIndexRoute
+  '/api/alerts/history': typeof ApiAlertsHistoryRoute
   '/api/alerts/settings': typeof ApiAlertsSettingsRoute
   '/api/alerts/test': typeof ApiAlertsTestRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
@@ -424,6 +433,7 @@ export interface FileRouteTypes {
     | '/api/users'
     | '/nodes/$id'
     | '/nodes/'
+    | '/api/alerts/history'
     | '/api/alerts/settings'
     | '/api/alerts/test'
     | '/api/auth/login'
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/api/users'
     | '/nodes/$id'
     | '/nodes'
+    | '/api/alerts/history'
     | '/api/alerts/settings'
     | '/api/alerts/test'
     | '/api/auth/login'
@@ -513,6 +524,7 @@ export interface FileRouteTypes {
     | '/api/users'
     | '/nodes/$id'
     | '/nodes/'
+    | '/api/alerts/history'
     | '/api/alerts/settings'
     | '/api/alerts/test'
     | '/api/auth/login'
@@ -557,6 +569,7 @@ export interface RootRouteChildren {
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   ApiTokensRoute: typeof ApiTokensRouteWithChildren
   ApiUsersRoute: typeof ApiUsersRouteWithChildren
+  ApiAlertsHistoryRoute: typeof ApiAlertsHistoryRoute
   ApiAlertsSettingsRoute: typeof ApiAlertsSettingsRoute
   ApiAlertsTestRoute: typeof ApiAlertsTestRoute
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
@@ -676,6 +689,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/nodes/$id'
       preLoaderRoute: typeof NodesIdRouteImport
       parentRoute: typeof NodesRoute
+    }
+    '/api/alerts/history': {
+      id: '/api/alerts/history'
+      path: '/api/alerts/history'
+      fullPath: '/api/alerts/history'
+      preLoaderRoute: typeof ApiAlertsHistoryRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/alerts/settings': {
       id: '/api/alerts/settings'
@@ -1016,6 +1036,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
   ApiTokensRoute: ApiTokensRouteWithChildren,
   ApiUsersRoute: ApiUsersRouteWithChildren,
+  ApiAlertsHistoryRoute: ApiAlertsHistoryRoute,
   ApiAlertsSettingsRoute: ApiAlertsSettingsRoute,
   ApiAlertsTestRoute: ApiAlertsTestRoute,
   ApiAuthLoginRoute: ApiAuthLoginRoute,

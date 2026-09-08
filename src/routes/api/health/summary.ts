@@ -45,8 +45,16 @@ async function fireAlert(payload: AlertPayload): Promise<void> {
     .join("\n")
 
   let delivered = false
-  delivered = (await notifyWebhook(text, payload)) || delivered
-  delivered = (await notifyEmail(subject, body)) || delivered
+  delivered =
+    (await notifyWebhook(text, payload, {
+      kind: payload.event,
+      nodeId: payload.node.id,
+    })) || delivered
+  delivered =
+    (await notifyEmail(subject, body, {
+      kind: payload.event,
+      nodeId: payload.node.id,
+    })) || delivered
   if (delivered) setAlertState(payload.node.id, !isDown, Date.now())
 }
 

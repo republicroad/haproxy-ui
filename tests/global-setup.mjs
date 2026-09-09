@@ -4,20 +4,21 @@ import { join } from "node:path"
 
 const pidFile = join(process.env.TEMP ?? "/tmp", "haproxy-ui-e2e-mock.pid")
 
-export default async function globalSetup() {
+function startMock(port) {
   const child = spawn(
     process.execPath,
     ["scripts/mock-dataplaneapi.mjs"],
-    { cwd: process.cwd(), env: { ...process.env, MOCK_PORT: "9090" }, detached: true, stdio: "ignore" },
+    { cwd: process.cwd(), env: { ...process.env, MOCK_PORT: String(port) }, detached: true, stdio: "ignore" },
   )
   child.unref()
-  writeFileSync(pidFile, String(child.pid))
+  return child.pid
+}
 
-  // wait for mock readiness
+async function waitReady(port) {
   const deadline = Date.now() + 20_000
   while (Date.now() < deadline) {
     try {
-      const res = await fetch("http://localhost:9090/v3/services/haproxy/runtime/info", {
+      const res = await fetch(`http://localhost:${port}/v3/services/haproxy/runtime/info`, {
         headers: { authorization: "Basic YWRtaW46YWRtaW4=" },
       })
       if (res.ok) return
@@ -26,5 +27,12 @@ export default async function globalSetup() {
     }
     await new Promise((r) => setTimeout(r, 500))
   }
-  throw new Error("mock dataplaneapi failed to start")
+  throw new Error(`mock dataplaneapi failed to start on :${port}`)
+}
+
+export default async function globalSetup() {
+  const pids = [startMock(9090), startMock(9091)]
+  writeFileSync(pidFile, pids.join("\n"))
+  await waitReady(9090)
+  await waitReady(9091)
 }

@@ -37,6 +37,7 @@ import { StatsTab } from "#/components/tabs/StatsTab"
 import { HistoryTab } from "#/components/tabs/HistoryTab"
 import { normalizeFrontends, normalizeBackends } from "#/lib/normalize"
 import { POLL } from "#/lib/poll"
+import { t } from "#/i18n"
 
 const TABS = ["overview", "frontends", "backends", "traffic", "acls", "rules", "waf", "logs", "maps", "certs", "userlists", "stats", "stick", "history", "raw"] as const
 type Tab = (typeof TABS)[number]
@@ -152,11 +153,11 @@ function NodeDetail() {
         className="border-b border-border pb-3"
       >
         <StepperNav>
-          {TABS.map((t, i) => (
-            <StepperItem key={t} step={i + 1}>
+          {TABS.map((tab, i) => (
+            <StepperItem key={tab} step={i + 1}>
               <StepperTrigger>
                 <StepperIndicator>{i + 1}</StepperIndicator>
-                <StepperTitle className="capitalize">{t}</StepperTitle>
+                <StepperTitle className="capitalize">{t(tab)}</StepperTitle>
               </StepperTrigger>
               {i < TABS.length - 1 && <StepperSeparator />}
             </StepperItem>
@@ -221,7 +222,9 @@ function NodeDetail() {
         />
       )}
 
-      {tab === "logs" && <LogsTab nodeId={id} frontends={feQ.data ?? []} />}
+      {tab === "logs" && (
+        <LogsTab nodeId={id} frontends={feQ.data ?? []} onNavigate={(t) => setTab(t as Tab)} />
+      )}
 
       {tab === "maps" && <MapsTab nodeId={id} />}
 

@@ -13,7 +13,22 @@ import { changeMetaSchema, fieldErrors } from "#/lib/schemas"
 export const Route = createFileRoute("/api/nodes/$id/changes")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ params, request }) => {
+        const url = new URL(request.url)
+        const since = url.searchParams.get("since")
+        const until = url.searchParams.get("until")
+        if (since !== null || until !== null) {
+          // time-window mode (log explorer drill-down)
+          const from = Number(since ?? 0)
+          const to = Number(until ?? Date.now())
+          if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) {
+            return Response.json({ error: "invalid since/until" }, { status: 400 })
+          }
+          const rows = listChangesByNode(params.id, 10_000).filter(
+            (c) => c.ts >= from && c.ts <= to,
+          )
+          return Response.json({ changes: rows, total: rows.length })
+        }
         return Response.json({
           changes: listChangesByNode(params.id),
           total: countChanges(params.id),

@@ -247,5 +247,5 @@ Browser ─┬─ /api/nodes (CRUD, test, export/import, diff) ──> TanStack 
 
 ## Roadmap
 
-- Anomaly alerts from ingested access logs (spike/5xx detection)
-- OIDC group-claim → node-group mapping for SSO-managed group admins
+- i18n zh-CN phase 3: remaining tabs, toasts and server error messages
+- TypeScript 7 (blocked on typescript-eslint peer-range support)

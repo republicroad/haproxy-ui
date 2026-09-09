@@ -73,10 +73,15 @@ jobs:
   integration:
     # Real-container verification: builds the bundled HAProxy +
     # dataplaneapi image and runs the API integration suite (itest)
-    # against it through the production server.
+    # against it through the production server. Matrix covers the
+    # dataplaneapi LTS line and current release to catch model drift.
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dpapi_version: ["v3.2.16", "v3.4.3"]
     env:
-      DPAPI_VERSION: v3.4.3
+      DPAPI_VERSION: ${{ matrix.dpapi_version }}
     steps:
       - uses: actions/checkout@v7
 

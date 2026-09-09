@@ -43,5 +43,11 @@ export default defineConfig({
       // projects that expect a clean fleet
       dependencies: ["setup", "app", "viewer"],
     },
+    {
+      name: "sync",
+      testMatch: /sync\.spec\.mjs/,
+      use: { storageState: "playwright/.auth/admin.json" },
+      dependencies: ["setup", "app", "viewer", "scopes"],
+    },
   ],
 })

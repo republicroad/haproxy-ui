@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.5.0] - 2026-09-09
+
+Verification-depth and drill-down release.
+
+### Added
+- **CI integration matrix**: the real-container itest job now runs
+  against dataplaneapi v3.2 LTS and v3.4, catching model drift between
+  releases in CI instead of in the field.
+- **Sync dry-run E2E**: browser scenario covering Preview (plan shown,
+  nothing written) and Apply against a second dataplaneapi instance;
+  the e2e harness now runs two isolated mocks.
+- **Log drill-down**: clicking a request in the log explorer shows the
+  configuration changes recorded within ±30 minutes of it, plus a jump
+  to the serving backend — changes API gained since/until filters.
+- **Advisor additions**: expired/expiring certificates and HTTP
+  frontends without an HTTPS redirect now surface as findings.
+- **i18n phase 2**: node detail tab titles and fleet-health card
+  headings translated.
+
 ## [2.4.0] - 2026-09-09
 
 Configurable-alerting and localization release.

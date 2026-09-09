@@ -30,6 +30,16 @@ type LogRow = {
   path: string | null
 }
 
+type ChangeRow = {
+  id: string
+  ts: number
+  kind: string
+  resource: string
+  target: string
+  parent: string | null
+  actor: string | null
+}
+
 type LogStatsSummary = {
   stats: {
     total: number
@@ -196,13 +206,17 @@ function fmtBytes(n: number | null): string {
 /**
  * Request explorer over the UDP-syslog ingested access logs
  * (HAPROXY_UI_LOG_PORT). Filters by frontend, status class and path.
+ * Clicking a row shows configuration changes from the surrounding time
+ * window (correlation) and a jump to the serving backend.
  */
 export function LogsTab({
   nodeId,
   frontends,
+  onNavigate,
 }: {
   nodeId: string
   frontends: Frontend[]
+  onNavigate?: (tab: string) => void
 }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -225,6 +239,24 @@ export function LogsTab({
     refetchInterval: POLL.STATS,
   })
   const rows = q.data ?? []
+  const [expanded, setExpanded] = useState<LogRow | null>(null)
+  const WINDOW_MS = 30 * 60_000
+
+  const changesQ = useQuery({
+    queryKey: ["log-drill", nodeId, expanded?.ts],
+    queryFn: async (): Promise<ChangeRow[]> => {
+      if (!expanded) return []
+      const params = new URLSearchParams({
+        since: String(expanded.ts - WINDOW_MS),
+        until: String(expanded.ts + WINDOW_MS),
+      })
+      const res = await fetch(`/api/nodes/${nodeId}/changes?${params}`)
+      if (!res.ok) throw new Error("failed to load changes")
+      const j = await res.json()
+      return j.changes ?? []
+    },
+    enabled: Boolean(expanded),
+  })
 
   return (
     <div className="space-y-3">
@@ -302,7 +334,15 @@ export function LogsTab({
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={i} className="border-t border-border">
+                <tr
+                  key={i}
+                  className={
+                    "cursor-pointer border-t border-border hover:bg-muted/40" +
+                    (expanded === r ? " bg-muted/60" : "")
+                  }
+                  onClick={() => setExpanded(expanded === r ? null : r)}
+                  title="Click for configuration changes around this request"
+                >
                   <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                     {new Date(r.ts).toLocaleTimeString()}
                   </td>
@@ -324,6 +364,52 @@ export function LogsTab({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {expanded && (
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium">
+              Changes within ±30 min of{" "}
+              {new Date(expanded.ts).toLocaleTimeString()}{" "}
+              <span className="font-mono text-xs text-muted-foreground">
+                ({expanded.method} {expanded.path} → {expanded.backend ?? "?"})
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {expanded.backend && onNavigate && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onNavigate("backends")}
+                >
+                  Open backends
+                </Button>
+              )}
+              <Button size="xs" variant="ghost" onClick={() => setExpanded(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+          {changesQ.isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+          {changesQ.data && changesQ.data.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No configuration changes recorded in this window — the error is
+              unlikely to be config-related.
+            </p>
+          )}
+          {(changesQ.data ?? []).map((c) => (
+            <div key={c.id} className="border-t border-border py-1 text-xs first:border-t-0">
+              <span className="text-muted-foreground">{new Date(c.ts).toLocaleString()}</span>
+              {" · "}
+              <span className="font-medium">
+                {c.kind} {c.resource} "{c.target}"
+              </span>
+              {c.parent ? <span className="text-muted-foreground"> in {c.parent}</span> : null}
+              {c.actor ? <span className="text-muted-foreground"> by {c.actor}</span> : null}
+            </div>
+          ))}
         </div>
       )}
     </div>

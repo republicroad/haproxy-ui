@@ -71,6 +71,27 @@ const zhCN: Record<string, string> = {
   // tokens page
   "full access": "完全访问",
   "read-only": "只读",
+  // node detail tabs
+  "overview": "概览",
+  "frontends": "前端",
+  "backends": "后端",
+  "traffic": "流量",
+  "acls": "ACL",
+  "rules": "规则",
+  "waf": "WAF",
+  "logs": "日志",
+  "maps": "映射表",
+  "certs": "证书",
+  "userlists": "用户列表",
+  "stats": "服务器",
+  "stick": "Stick 表",
+  "history": "历史",
+  "raw": "原始配置",
+  // fleet health card
+  "Node": "节点",
+  "Status": "状态",
+  "Latency": "延迟",
+  "Servers": "服务器",
   // common
   "Delete": "删除",
   "Edit": "编辑",

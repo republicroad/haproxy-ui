@@ -898,17 +898,40 @@ export function RulesTab({
                       }
                       setChkErrors({})
                       // dataplaneapi models an expectation as
-                      // {type:"expect", value:"<kind> <value>"}; http_checks
-                      // are upserted via indexed PUT
-                      void addIndexed(
-                        "http_checks",
-                        checkQ.data,
-                        { type: "expect", value: `${parsed.data.type} ${parsed.data.value}` },
-                        {
-                          resource: "check",
-                          target: `${parsed.data.type} ${parsed.data.value}`,
-                        },
-                      )
+                      // {type:"expect", value:"<kind> <value>"}. Indexed
+                      // http_checks POSTs are silently dropped inside
+                      // transactions (observed on v3.4.x), so this one
+                      // applies out-of-transaction with force_reload —
+                      // still validated by haproxy -c and recorded here.
+                      const body = { type: "expect", value: `${parsed.data.type} ${parsed.data.value}` }
+                      const target = `${parsed.data.type} ${parsed.data.value}`
+                      setPending(true)
+                      void (async () => {
+                        try {
+                          await dpPost(
+                            nodeId,
+                            `${sub("http_checks")}/0?force_reload=true`,
+                            body,
+                          )
+                          await fetch(`/api/nodes/${nodeId}/changes`, {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                              kind: "create",
+                              resource: "check",
+                              target,
+                              parent: `${parentType.replace(/s$/, "")}/${effectiveName}`,
+                              payload: body,
+                            }),
+                          })
+                          toast.success("Rule added")
+                          reload("http_checks")
+                        } catch (e) {
+                          toast.error("Failed to add rule", { description: (e as Error).message })
+                        } finally {
+                          setPending(false)
+                        }
+                      })()
                     }}
                     disabled={pending || !effectiveName}
                   >

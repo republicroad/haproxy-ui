@@ -105,8 +105,8 @@ const run = async () => {
 
   tx = await newTx()
   r = await dp(
-    "PUT",
-    `services/haproxy/configuration/backends/be_int/http_checks/0?transaction_id=${tx}`,
+    "POST",
+    `services/haproxy/configuration/backends/be_int/http_checks/0?force_reload=true`,
     { type: "expect", value: "status 200" },
   )
   console.log("http check:", r.status, r.ok ? "" : await r.clone().text())

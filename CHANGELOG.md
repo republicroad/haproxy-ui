@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.1] - 2026-09-09
+
+### Fixed
+- Real-dataplaneapi compatibility for the new rule surface, verified by
+  the new CI integration job against dataplaneapi v3.4.3 / HAProxy 3.3:
+  backend_switching_rules are created with indexed POSTs, http_checks
+  via out-of-transaction indexed POST with force_reload (in-transaction
+  indexed POSTs are silently dropped), the expect action uses
+  match/pattern fields, and stick_table size/expire are integers with a
+  string store.
+
 ## [2.3.0] - 2026-09-09
 
 Tooling and quality release: real-container CI integration, log query

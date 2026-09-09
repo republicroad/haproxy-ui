@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { DatabaseSync } from "node:sqlite"
 import { db } from "#/lib/db"
 import { isGlobalAdmin } from "#/lib/auth"
 
@@ -70,10 +71,23 @@ export const Route = createFileRoute("/api/db/backup")({
         }
         // VACUUM INTO produces a compacted, consistent snapshot while online
         db.prepare(`VACUUM INTO ?`).run(target)
+        // verify the snapshot is a healthy database before reporting success
+        let integrity = "ok"
+        try {
+          const check = new DatabaseSync(target, { readOnly: true })
+          const row = check.prepare("PRAGMA quick_check").get() as { quick_check: string }
+          check.close()
+          integrity = row.quick_check
+        } catch (e) {
+          integrity = `check failed: ${(e as Error).message}`
+        }
+        if (integrity !== "ok") {
+          return Response.json({ ok: false, name, integrity, dir }, { status: 500 })
+        }
         pruneOldBackups(dir)
         const st = statSync(target)
         return Response.json(
-          { ok: true, name, size: st.size, dir },
+          { ok: true, name, size: st.size, dir, integrity },
           { status: 201 },
         )
       },

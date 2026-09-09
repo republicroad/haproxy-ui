@@ -8,7 +8,27 @@ import {
   LogOut,
   Users as UsersIcon,
   KeyRound,
+  Languages,
 } from "lucide-react"
+import { getLang, setLang, t } from "#/i18n"
+
+function LanguageToggle() {
+  const lang = getLang()
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setLang(lang === "en" ? "zh-CN" : "en")
+        window.location.reload()
+      }}
+      aria-label="language"
+      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    >
+      <Languages className="h-4 w-4" />
+      {lang === "en" ? "中文" : "English"}
+    </button>
+  )
+}
 
 function LogoutButton() {
   const navigate = useNavigate()
@@ -17,13 +37,13 @@ function LogoutButton() {
       type="button"
       onClick={async () => {
         await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
-        toast.success("Signed out")
+        toast.success(t("Signed out"))
         navigate({ to: "/login", search: { from: undefined } })
       }}
       className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >
       <LogOut className="h-4 w-4" />
-      Sign out
+      {t("Sign out")}
     </button>
   )
 }
@@ -46,12 +66,12 @@ export function Sidebar() {
   }, [])
 
   const nav = [
-    { to: "/" as const, label: "Overview", icon: LayoutDashboard },
-    { to: "/nodes" as const, label: "Nodes", icon: Boxes },
+    { to: "/" as const, label: t("Overview"), icon: LayoutDashboard },
+    { to: "/nodes" as const, label: t("Nodes"), icon: Boxes },
     ...(authEnabled && role === "admin"
       ? [
-          { to: "/users" as const, label: "Users", icon: UsersIcon },
-          { to: "/tokens" as const, label: "API tokens", icon: KeyRound },
+          { to: "/users" as const, label: t("Users"), icon: UsersIcon },
+          { to: "/tokens" as const, label: t("API tokens"), icon: KeyRound },
         ]
       : []),
   ]
@@ -98,6 +118,9 @@ export function Sidebar() {
           <LogoutButton />
         </div>
       )}
+      <div className="mt-1 border-t border-border pt-2">
+        <LanguageToggle />
+      </div>
     </aside>
   )
 }

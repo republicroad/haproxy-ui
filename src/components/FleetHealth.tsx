@@ -78,6 +78,14 @@ type SmtpSettingsUi = {
   hasPassword?: boolean
 }
 
+type AnomalySettingsUi = {
+  anom5xxPct: number | null
+  anomRateMult: number | null
+  anomLatencyMs: number | null
+  anomMinRequests: number | null
+  anomCooldownMin: number | null
+}
+
 function AlertSettingsModal({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState("")
   const [enabled, setEnabled] = useState(false)
@@ -90,6 +98,13 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
     fromAddr: "",
     toAddrs: "",
     enabled: false,
+  })
+  const [anom, setAnom] = useState<AnomalySettingsUi>({
+    anom5xxPct: null,
+    anomRateMult: null,
+    anomLatencyMs: null,
+    anomMinRequests: null,
+    anomCooldownMin: null,
   })
   const [loaded, setLoaded] = useState(false)
   const [pending, setPending] = useState(false)
@@ -104,12 +119,14 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
             webhookUrl: string
             enabled: boolean
             smtp?: SmtpSettingsUi
+            anomaly?: AnomalySettingsUi
           } | null,
         ) => {
           if (j) {
             setUrl(j.webhookUrl)
             setEnabled(j.enabled)
             if (j.smtp) setSmtp({ ...smtp, ...j.smtp })
+            if (j.anomaly) setAnom({ ...anom, ...j.anomaly })
           }
           setLoaded(true)
         },
@@ -157,6 +174,7 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
             toAddrs: smtp.toAddrs,
             enabled: smtp.enabled,
           },
+          anomaly: anom,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -273,6 +291,43 @@ function AlertSettingsModal({ onClose }: { onClose: () => void }) {
             />
             Implicit TLS (port 465); otherwise STARTTLS when offered
           </label>
+        </div>
+
+        <div className="mt-1 border-t border-border pt-3">
+          <div className="mb-2 text-sm font-medium">
+            Anomaly detection (access-log windows)
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Empty fields use the defaults (20 %, 5×, 2000 ms, 50 requests,
+            15 min). Applied on the next 5-minute scan.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(
+              [
+                ["5xx %", "anom5xxPct", "e.g. 20"],
+                ["Rate ×", "anomRateMult", "e.g. 5"],
+                ["Latency ms", "anomLatencyMs", "e.g. 2000"],
+                ["Min reqs", "anomMinRequests", "e.g. 50"],
+                ["Cooldown min", "anomCooldownMin", "e.g. 15"],
+              ] as [string, keyof AnomalySettingsUi, string][]
+            ).map(([label, key, ph]) => (
+              <div key={key}>
+                <Label className="mb-1 block text-xs text-muted-foreground">{label}</Label>
+                <Input
+                  type="number"
+                  value={anom[key] ?? ""}
+                  onChange={(e) =>
+                    setAnom({
+                      ...anom,
+                      [key]: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                  placeholder={ph}
+                  aria-label={label}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}

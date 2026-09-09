@@ -185,6 +185,19 @@ try {
 } catch {
   // already migrated
 }
+for (const col of [
+  "anom_5xx_pct INTEGER",
+  "anom_rate_mult INTEGER",
+  "anom_latency_ms INTEGER",
+  "anom_min_requests INTEGER",
+  "anom_cooldown_min INTEGER",
+]) {
+  try {
+    db.exec(`ALTER TABLE alert_settings ADD COLUMN ${col}`)
+  } catch {
+    // already migrated
+  }
+}
 
 // Kick off the background maintenance scheduler (retention, backups).
 // Dynamic import so the module itself stays test-friendly; unref'd timers.
@@ -516,25 +529,69 @@ export function trimHealthChecks(keepCount = 720): void {
   `)
 }
 
-export type AlertSettings = { webhookUrl: string; enabled: boolean }
+export type AlertSettings = {
+  webhookUrl: string
+  enabled: boolean
+  /** anomaly thresholds; null = use env/default fallbacks */
+  anom5xxPct: number | null
+  anomRateMult: number | null
+  anomLatencyMs: number | null
+  anomMinRequests: number | null
+  anomCooldownMin: number | null
+}
 
 export function getAlertSettings(): AlertSettings {
   db.exec(
     "INSERT OR IGNORE INTO alert_settings (id, webhook_url, enabled) VALUES (1, '', 0)",
   )
   const row = db
-    .prepare("SELECT webhook_url, enabled FROM alert_settings WHERE id = 1")
-    .get() as { webhook_url: string; enabled: number }
-  return { webhookUrl: row.webhook_url, enabled: row.enabled === 1 }
+    .prepare(
+      "SELECT webhook_url, enabled, anom_5xx_pct, anom_rate_mult, anom_latency_ms, anom_min_requests, anom_cooldown_min FROM alert_settings WHERE id = 1",
+    )
+    .get() as {
+    webhook_url: string
+    enabled: number
+    anom_5xx_pct: number | null
+    anom_rate_mult: number | null
+    anom_latency_ms: number | null
+    anom_min_requests: number | null
+    anom_cooldown_min: number | null
+  }
+  return {
+    webhookUrl: row.webhook_url,
+    enabled: row.enabled === 1,
+    anom5xxPct: row.anom_5xx_pct ?? null,
+    anomRateMult: row.anom_rate_mult ?? null,
+    anomLatencyMs: row.anom_latency_ms ?? null,
+    anomMinRequests: row.anom_min_requests ?? null,
+    anomCooldownMin: row.anom_cooldown_min ?? null,
+  }
 }
 
-export function setAlertSettings(s: { webhookUrl: string; enabled: boolean }): void {
+export function setAlertSettings(s: {
+  webhookUrl: string
+  enabled: boolean
+  anom5xxPct?: number | null
+  anomRateMult?: number | null
+  anomLatencyMs?: number | null
+  anomMinRequests?: number | null
+  anomCooldownMin?: number | null
+}): void {
   db.exec(
     "INSERT OR IGNORE INTO alert_settings (id, webhook_url, enabled) VALUES (1, '', 0)",
   )
-  db.prepare("UPDATE alert_settings SET webhook_url = ?, enabled = ? WHERE id = 1").run(
+  db.prepare(
+    `UPDATE alert_settings SET webhook_url = ?, enabled = ?,
+     anom_5xx_pct = ?, anom_rate_mult = ?, anom_latency_ms = ?,
+     anom_min_requests = ?, anom_cooldown_min = ? WHERE id = 1`,
+  ).run(
     s.webhookUrl,
     s.enabled ? 1 : 0,
+    s.anom5xxPct ?? null,
+    s.anomRateMult ?? null,
+    s.anomLatencyMs ?? null,
+    s.anomMinRequests ?? null,
+    s.anomCooldownMin ?? null,
   )
 }
 

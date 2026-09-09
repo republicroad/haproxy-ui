@@ -3,6 +3,14 @@ import { getAlertSettings, getSmtpSettings, setAlertSettings, setSmtpSettings } 
 import { z } from "zod"
 import { fieldErrors } from "#/lib/schemas"
 
+const anomalyFields = {
+  anom5xxPct: z.coerce.number().int().min(1).max(100).nullable().optional(),
+  anomRateMult: z.coerce.number().int().min(2).max(1000).nullable().optional(),
+  anomLatencyMs: z.coerce.number().int().min(100).max(600_000).nullable().optional(),
+  anomMinRequests: z.coerce.number().int().min(1).max(100_000).nullable().optional(),
+  anomCooldownMin: z.coerce.number().int().min(1).max(1440).nullable().optional(),
+}
+
 const settingsSchema = z.object({
   webhookUrl: z.string().trim().url({ protocol: /^https?$/ }).or(z.literal("")).default(""),
   enabled: z.boolean().default(false),
@@ -18,6 +26,7 @@ const settingsSchema = z.object({
       enabled: z.boolean().default(false),
     })
     .optional(),
+  anomaly: z.object(anomalyFields).optional(),
 })
 
 export const Route = createFileRoute("/api/alerts/settings")({
@@ -74,7 +83,11 @@ export const Route = createFileRoute("/api/alerts/settings")({
             enabled: data.smtp.enabled,
           })
         }
-        setAlertSettings({ webhookUrl: data.webhookUrl, enabled: data.enabled })
+        setAlertSettings({
+          webhookUrl: data.webhookUrl,
+          enabled: data.enabled,
+          ...(data.anomaly ?? {}),
+        })
         return Response.json({ ok: true })
       },
     },

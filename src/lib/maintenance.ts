@@ -1,5 +1,6 @@
 import { join, resolve } from "node:path"
 import {
+  getAlertSettings,
   getAlertState,
   listNodes,
   deleteChangesBefore,
@@ -31,13 +32,13 @@ const CERT_WARN_DAYS = Number(process.env.HAPROXY_UI_CERT_WARN_DAYS ?? 30)
 const CERT_CHECK_INTERVAL_MS = 24 * 3_600_000 // scan certificates daily
 const ANOMALY_INTERVAL_MS =
   Number(process.env.HAPROXY_UI_ANOMALY_INTERVAL ?? 300) * 1000 // default 5 min
-const ANOMALY_COOLDOWN_MS =
-  Number(process.env.HAPROXY_UI_ANOMALY_COOLDOWN_MIN ?? 15) * 60_000
-const ANOMALY_THRESHOLDS = {
+// env values are fallbacks; per-deployment overrides live in alert_settings
+const ANOMALY_ENV_FALLBACK = {
   err5xxPct: Number(process.env.HAPROXY_UI_ANOMALY_5XX_PCT ?? DEFAULT_THRESHOLDS.err5xxPct),
   rateMult: Number(process.env.HAPROXY_UI_ANOMALY_RATE_MULT ?? DEFAULT_THRESHOLDS.rateMult),
   latencyMs: Number(process.env.HAPROXY_UI_ANOMALY_LATENCY_MS ?? DEFAULT_THRESHOLDS.latencyMs),
   minRequests: Number(process.env.HAPROXY_UI_ANOMALY_MIN_REQUESTS ?? DEFAULT_THRESHOLDS.minRequests),
+  cooldownMin: Number(process.env.HAPROXY_UI_ANOMALY_COOLDOWN_MIN ?? 15),
 }
 
 let started = false
@@ -162,14 +163,23 @@ async function checkCertExpiry(upNodeIds: string[]): Promise<void> {
  */
 async function checkAnomalies(): Promise<void> {
   if (!alertChannelsEnabled()) return
+  const settings = getAlertSettings()
+  const thresholds = {
+    err5xxPct: settings.anom5xxPct ?? ANOMALY_ENV_FALLBACK.err5xxPct,
+    rateMult: settings.anomRateMult ?? ANOMALY_ENV_FALLBACK.rateMult,
+    latencyMs: settings.anomLatencyMs ?? ANOMALY_ENV_FALLBACK.latencyMs,
+    minRequests: settings.anomMinRequests ?? ANOMALY_ENV_FALLBACK.minRequests,
+  }
+  const cooldownMs =
+    (settings.anomCooldownMin ?? ANOMALY_ENV_FALLBACK.cooldownMin) * 60_000
   const now = Date.now()
   for (const node of listNodes()) {
     const current = logWindowStats(node.id, now - 5 * 60_000, now)
     const baseline = logWindowStats(node.id, now - 35 * 60_000, now - 5 * 60_000)
-    for (const kind of detectAnomalies(current, baseline, ANOMALY_THRESHOLDS)) {
+    for (const kind of detectAnomalies(current, baseline, thresholds)) {
       const key = `anom:${kind}:${node.id}`
       const state = getAlertState(key)
-      if (now - state.lastAlertTs < ANOMALY_COOLDOWN_MS) continue
+      if (now - state.lastAlertTs < cooldownMs) continue
       const label = {
         err5xx: `5xx share ${(current.err5xx / Math.max(current.total, 1) * 100).toFixed(0)}% in the last 5 min`,
         rate: `traffic spike: ${current.total} requests in 5 min (baseline ~${Math.round(baseline.total / 6)}/5min)`,
@@ -281,7 +291,7 @@ export function startMaintenance(): void {
     checkAnomalies().catch((e) => console.error("[anomaly] check failed:", e))
   }, ANOMALY_INTERVAL_MS).unref()
   console.log(
-    `[maintenance] anomaly detector started (interval=${ANOMALY_INTERVAL_MS / 1000}s, cooldown=${ANOMALY_COOLDOWN_MS / 60_000}min)`,
+    `[maintenance] anomaly detector started (interval=${ANOMALY_INTERVAL_MS / 1000}s; thresholds from alert settings)`,
   )
 }
 

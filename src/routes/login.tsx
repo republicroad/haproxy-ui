@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { Label } from "#/components/ui/label"
+import { t } from "#/i18n"
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -47,9 +48,9 @@ function LoginPage() {
         className="w-full max-w-sm space-y-4 rounded-lg border border-border bg-card p-6 shadow-sm"
       >
         <div>
-          <h1 className="text-xl font-bold">Sign in to HAProxy UI</h1>
+          <h1 className="text-xl font-bold">{t("Sign in to HAProxy UI")}</h1>
           <p className="text-sm text-muted-foreground">
-            Use the credentials configured via HAPROXY_UI_USER / HAPROXY_UI_PASS
+            {t("Use the credentials configured via HAPROXY_UI_USER / HAPROXY_UI_PASS")}
           </p>
         </div>
         {sso && (
@@ -67,12 +68,12 @@ function LoginPage() {
         {sso && (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            or with a local account
+            {t("or with a local account")}
             <span className="h-px flex-1 bg-border" />
           </div>
         )}
         <div className="space-y-2">
-          <Label htmlFor="login-user">Username</Label>
+          <Label htmlFor="login-user">{t("Username")}</Label>
           <Input
             id="login-user"
             value={user}
@@ -82,7 +83,7 @@ function LoginPage() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="login-pass">Password</Label>
+          <Label htmlFor="login-pass">{t("Password")}</Label>
           <Input
             id="login-pass"
             type="password"
@@ -93,12 +94,12 @@ function LoginPage() {
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
+          {pending ? t("Signing in…") : t("Sign in")}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
-          No password configured?{" "}
+          {t("No password configured?")}{" "}
           <Link to="/" className="underline">
-            Go to the dashboard
+            {t("Go to the dashboard")}
           </Link>
         </p>
       </form>

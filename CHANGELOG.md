@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.4.0] - 2026-09-09
+
+Configurable-alerting and localization release.
+
+### Added
+- **Anomaly thresholds in the UI**: the alert settings dialog gains an
+  anomaly section (5xx %, rate multiplier, latency ms, minimum sample,
+  cooldown) persisted in the database; the detector picks changes up on
+  its next scan. Env variables remain as first-run defaults.
+- **Backup integrity**: every VACUUM INTO snapshot is verified with
+  PRAGMA quick_check before being reported as created.
+- **i18n framework + zh-CN** (phase 1): lightweight dictionary with
+  English-key fallback and a sidebar language toggle; navigation, login,
+  overview and users/tokens headings are translated. Remaining surfaces
+  are tracked for phase 2.
+
 ## [2.3.1] - 2026-09-09
 
 ### Fixed

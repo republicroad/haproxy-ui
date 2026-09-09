@@ -4,6 +4,7 @@ import { NodesTable } from "#/components/NodesTable"
 import { FleetHealth } from "#/components/FleetHealth"
 import type { NodeRow } from "#/lib/types"
 import { POLL } from "#/lib/poll"
+import { t } from "#/i18n"
 
 async function fetchNodes(): Promise<NodeRow[]> {
   const res = await fetch("/api/nodes")
@@ -49,14 +50,14 @@ function Overview() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Overview</h1>
-        <p className="text-muted-foreground">HAProxy fleet at a glance</p>
+        <h1 className="text-2xl font-bold">{t("Overview")}</h1>
+        <p className="text-muted-foreground">{t("HAProxy fleet at a glance")}</p>
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Stat label="Nodes" value={nodes.length} />
-        <Stat label="Up" value={up} tone="success" />
-        <Stat label="Down" value={down} tone="destructive" />
-        <Stat label="Unknown" value={nodes.length - up - down} />
+        <Stat label={t("Nodes")} value={nodes.length} />
+        <Stat label={t("Up")} value={up} tone="success" />
+        <Stat label={t("Down")} value={down} tone="destructive" />
+        <Stat label={t("Unknown")} value={nodes.length - up - down} />
       </div>
       <FleetHealth />
       <div>

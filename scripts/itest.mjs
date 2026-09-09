@@ -104,9 +104,10 @@ const run = async () => {
   await commit(tx)
 
   tx = await newTx()
+  const chkVer = await j(await dp("GET", "services/haproxy/configuration/version"))
   r = await dp(
     "POST",
-    `services/haproxy/configuration/backends/be_int/http_checks/0?force_reload=true`,
+    `services/haproxy/configuration/backends/be_int/http_checks/0?version=${chkVer}&force_reload=true`,
     { type: "expect", value: "status 200" },
   )
   console.log("http check:", r.status, r.ok ? "" : await r.clone().text())

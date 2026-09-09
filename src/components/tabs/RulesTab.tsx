@@ -908,9 +908,14 @@ export function RulesTab({
                       setPending(true)
                       void (async () => {
                         try {
+                          // optimistic concurrency against the live version
+                          const ver = await dpGet<number>(
+                            nodeId,
+                            "services/haproxy/configuration/version",
+                          )
                           await dpPost(
                             nodeId,
-                            `${sub("http_checks")}/0?force_reload=true`,
+                            `${sub("http_checks")}/0?version=${ver}&force_reload=true`,
                             body,
                           )
                           await fetch(`/api/nodes/${nodeId}/changes`, {

@@ -46,8 +46,10 @@ type SwitchRule = {
 }
 
 type HttpCheck = {
-  // real dataplaneapi wraps expectations as {type:"expect", value:"status 200"}
+  // real dataplaneapi stores expectations as {type:"expect", match:"status", pattern:"200"}
   type: string
+  match?: string
+  pattern?: string
   value?: string
 }
 
@@ -531,14 +533,10 @@ export function RulesTab({
     backend: r.name,
     condition: `${r.cond} ${r.cond_test ?? ""}`,
   }))
-  const checkRows = (checkQ.data ?? []).map((r) => {
-    // real dataplaneapi stores expects as {type:"expect", value:"status 200"}
-    const [kind, ...rest] = (r.value ?? "").split(" ")
-    return {
-      type: r.type === "expect" ? kind : r.type,
-      value: r.type === "expect" ? rest.join(" ") : (r.value ?? ""),
-    }
-  })
+  const checkRows = (checkQ.data ?? []).map((r) => ({
+    type: r.type === "expect" ? (r.match ?? "expect") : r.type,
+    value: r.type === "expect" ? (r.pattern ?? "") : (r.value ?? ""),
+  }))
 
   // ---------------- TCP rules form ----------------
 
@@ -903,7 +901,7 @@ export function RulesTab({
                       // transactions (observed on v3.4.x), so this one
                       // applies out-of-transaction with force_reload —
                       // still validated by haproxy -c and recorded here.
-                      const body = { type: "expect", value: `${parsed.data.type} ${parsed.data.value}` }
+                      const body = { type: "expect", match: parsed.data.type, pattern: parsed.data.value }
                       const target = `${parsed.data.type} ${parsed.data.value}`
                       setPending(true)
                       void (async () => {

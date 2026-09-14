@@ -63,7 +63,7 @@ jobs:
           artifact-name: sbom-${{ github.ref_name }}.spdx.json
 
       - name: Attest SBOM
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         continue-on-error: true
         with:
           subject-name: ${{ env.IMAGE }}
